@@ -458,48 +458,6 @@ table.data tbody tr:hover {
     transform: none;
   }
 }
-.auth-tabs {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  border: 1px solid var(--line);
-  background: #f4f1ea;
-  border-radius: 12px;
-  padding: 3px;
-}
-.auth-tab-indicator {
-  position: absolute;
-  top: 3px;
-  bottom: 3px;
-  left: 3px;
-  width: calc(50% - 3px);
-  border-radius: 9px;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(31, 36, 33, 0.12);
-  transition: transform calc(240ms * var(--site-motion, 1)) cubic-bezier(0.22, 1, 0.36, 1);
-}
-.auth-tab-indicator-right {
-  transform: translateX(100%);
-}
-.auth-tab {
-  position: relative;
-  z-index: 1;
-  display: block;
-  text-align: center;
-  padding: 8px 0;
-  border: none;
-  background: transparent;
-  border-radius: 9px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted);
-  cursor: pointer;
-  transition: color 160ms ease;
-}
-.auth-tab-active {
-  color: #0b6357;
-}
-
 .shake {
   animation: shakeX calc(360ms * var(--site-motion, 1)) ease;
 }

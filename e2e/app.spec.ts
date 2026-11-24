@@ -8,12 +8,14 @@ let page: Page;
 async function loadDemo(target: Page, username = 'e2e演示员') {
   await target.goto('/');
   await expect(target.getByTestId('auth-page')).toBeVisible();
-  await target.getByTestId('auth-tab-register').click();
+  await target.getByTestId('auth-go-register').click();
+  await expect(target).toHaveURL(/#\/register$/);
   await expect(target.getByTestId('auth-confirm')).toBeVisible();
   await target.getByTestId('auth-username').fill(username);
   await target.getByTestId('auth-password').fill('e2e-pass-123');
   await target.getByTestId('auth-confirm').fill('e2e-pass-123');
   await target.getByTestId('auth-submit').click();
+  await expect(target).toHaveURL(/#\/login$/);
   await expect(target.getByTestId('auth-registered-note')).toBeVisible();
   await expect(target.getByTestId('auth-username')).toHaveValue(username);
   await target.getByTestId('auth-password').fill('e2e-pass-123');

@@ -1,8 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, Lock, ShieldCheck, User } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, Lock, ShieldCheck, User, UserPlus } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import { cn } from './ui';
 
 const COINS = [
   { left: '6%', delay: '0s', duration: '11s', size: 22 },
@@ -131,21 +130,28 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           </div>
         </div>
 
-        <div className="auth-tabs mt-6" role="tablist" aria-label="登录或注册">
-          <span className={cn('auth-tab-indicator', mode === 'register' && 'auth-tab-indicator-right')} aria-hidden="true" />
-          <Link role="tab" aria-selected={mode === 'login'} data-testid="auth-tab-login" to="/login" className={cn('auth-tab', mode === 'login' && 'auth-tab-active')}>
-            登录
-          </Link>
-          <Link role="tab" aria-selected={mode === 'register'} data-testid="auth-tab-register" to="/register" className={cn('auth-tab', mode === 'register' && 'auth-tab-active')}>
-            注册
-          </Link>
-        </div>
-
         <div className="mt-5">
-          <h1 className="text-[17px] font-semibold tracking-tight">{mode === 'login' ? '欢迎回来' : '创建本地账户'}</h1>
+          {mode === 'register' && (
+            <button
+              type="button"
+              className="mb-3 inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] font-semibold text-[#0B6357] transition hover:bg-[#E3F1ED]"
+              onClick={() => navigate('/login')}
+              data-testid="auth-go-login"
+            >
+              <ArrowLeft size={14} /> 返回登录
+            </button>
+          )}
+          <h1 className="text-[19px] font-semibold tracking-tight">{mode === 'login' ? '欢迎回来' : '创建本地账户'}</h1>
           <p className="mt-1 text-[12px] leading-relaxed text-[#6B6A63]">
             {mode === 'login' ? '登录你的本地账本，继续查看现金流。' : '账户与账本只保存在这台设备的浏览器里，注册后需登录进入。'}
           </p>
+          {mode === 'register' && (
+            <ul className="mt-3 space-y-1.5 rounded-lg border border-[#E4E0D8] bg-[#FAF8F3] px-3 py-2.5 text-[11.5px] leading-relaxed text-[#6B6A63]">
+              <li className="flex items-center gap-1.5"><CheckCircle2 size={13} className="shrink-0 text-[#0B6357]" /> 密码加盐哈希，仅存本机浏览器</li>
+              <li className="flex items-center gap-1.5"><CheckCircle2 size={13} className="shrink-0 text-[#0B6357]" /> 每个用户独立账本，互不可见</li>
+              <li className="flex items-center gap-1.5"><CheckCircle2 size={13} className="shrink-0 text-[#0B6357]" /> 注册完成后返回登录页进入账本</li>
+            </ul>
+          )}
         </div>
 
         {mode === 'login' && registeredName && (
@@ -214,13 +220,16 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           </button>
         </form>
 
-        <p className="mt-4 text-center text-[12px] text-[#6B6A63]">
-          {mode === 'login' ? (
-            <>还没有账户？<Link to="/register" className="font-semibold text-[#0B6357] hover:underline">注册新账户</Link></>
-          ) : (
-            <>已有账户？<Link to="/login" className="font-semibold text-[#0B6357] hover:underline">直接登录</Link></>
-          )}
-        </p>
+        {mode === 'login' && (
+          <button
+            type="button"
+            className="btn btn-secondary mt-4 w-full !py-2.5"
+            onClick={() => navigate('/register')}
+            data-testid="auth-go-register"
+          >
+            <UserPlus size={15} /> 没有账户？注册新账户
+          </button>
+        )}
 
         <div className="mt-4 flex items-start gap-2 rounded-lg border border-[#E4E0D8] bg-[#FAF8F3] px-3 py-2.5 text-[11px] leading-relaxed text-[#6B6A63]">
           <ShieldCheck size={14} className="mt-0.5 shrink-0 text-[#0B6357]" />
