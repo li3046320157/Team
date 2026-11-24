@@ -5,7 +5,7 @@ test.describe.configure({ mode: 'serial' });
 let context: BrowserContext;
 let page: Page;
 
-async function loadDemo(target: Page, username = 'e2e演示员') {
+async function loadApp(target: Page, username = 'e2e演示员') {
   await target.goto('/');
   await expect(target.getByTestId('auth-page')).toBeVisible();
   await target.getByTestId('auth-go-register').click();
@@ -20,24 +20,28 @@ async function loadDemo(target: Page, username = 'e2e演示员') {
   await expect(target.getByTestId('auth-username')).toHaveValue(username);
   await target.getByTestId('auth-password').fill('e2e-pass-123');
   await target.getByTestId('auth-submit').click();
-  await expect(target.getByTestId('load-demo')).toBeVisible({ timeout: 60_000 });
-  await target.getByTestId('load-demo').click();
+  await expect(target.getByRole('button', { name: '开始记账' })).toBeVisible({ timeout: 60_000 });
+  await target.getByPlaceholder('例如：日常账户（留空用默认名）').fill('日常账户');
+  await target.getByPlaceholder('0.00').fill('5000');
+  await target.getByPlaceholder('例如：5000').fill('1000');
+  await target.getByRole('button', { name: '开始记账' }).click();
   await expect(target.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
 }
 
 test.beforeAll(async ({ browser }) => {
   context = await browser.newContext();
   page = await context.newPage();
-  await loadDemo(page);
+  await loadApp(page);
 });
 
 test.afterAll(async () => {
   await context.close();
 });
 
-test('示例数据加载后，总览显示现金流预测与预算摘要', async () => {
+test('总览首屏说明系统目的与全部功能，并显示现金流摘要', async () => {
   await expect(page.getByTestId('dashboard')).toBeVisible();
-  await expect(page.getByRole('heading', { name: '示例总览' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /花钱之前/ })).toBeVisible();
+  await expect(page.getByText('全部功能 · 每个模块解决什么问题')).toBeVisible();
   await expect(page.getByText('未来 30 天余额')).toBeVisible();
   await expect(page.getByTestId('quick-add')).toBeVisible();
 });
@@ -177,6 +181,26 @@ test('登录注册：错误密码提示、退出与重新登录', async () => {
   await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
 });
 
+test('清除本机数据后，新注册用户从空账本开始', async () => {
+  await page.goto('/#/settings');
+  await expect(page.getByTestId('settings')).toBeVisible();
+  await page.getByTestId('wipe-local-data').click();
+  const dialog = page.getByRole('dialog', { name: '清除本机全部数据？' });
+  await dialog.getByTestId('confirm-wipe-local-data').click();
+  await expect(page.getByTestId('auth-page')).toBeVisible({ timeout: 30_000 });
+
+  await page.getByTestId('auth-go-register').click();
+  await page.getByTestId('auth-username').fill('e2e新用户');
+  await page.getByTestId('auth-password').fill('e2e-pass-456');
+  await page.getByTestId('auth-confirm').fill('e2e-pass-456');
+  await page.getByTestId('auth-submit').click();
+  await expect(page.getByTestId('auth-registered-note')).toBeVisible();
+  await page.getByTestId('auth-password').fill('e2e-pass-456');
+  await page.getByTestId('auth-submit').click();
+  await expect(page.getByRole('button', { name: '开始记账' })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('dashboard')).toHaveCount(0);
+});
+
 test('移动端：底部导航与「更多」抽屉可进入计划页', async ({ browser }) => {
   const mobile = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -185,7 +209,7 @@ test('移动端：底部导航与「更多」抽屉可进入计划页', async ({
     locale: 'zh-CN',
   });
   const mp = await mobile.newPage();
-  await loadDemo(mp, 'e2e移动端');
+  await loadApp(mp, 'e2e移动端');
   await expect(mp.getByRole('navigation', { name: '底部导航' })).toBeVisible();
   await mp.getByRole('button', { name: '更多', exact: true }).click();
   await expect(mp.getByText(/更多功能/)).toBeVisible();

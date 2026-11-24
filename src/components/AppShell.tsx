@@ -49,29 +49,7 @@ function Brand() {
   );
 }
 
-function ModeButton() {
-  const mode = useAppStore((s) => s.mode);
-  const switchMode = useAppStore((s) => s.switchMode);
-  return (
-    <button
-      type="button"
-      onClick={() => void switchMode(mode === 'demo' ? 'personal' : 'demo')}
-      className="w-full rounded-xl border border-[#E4E0D8] bg-[#FAF8F3] px-3 py-2.5 text-left transition hover:border-[#CFC9BD]"
-      data-testid="mode-switch"
-    >
-      <div className="flex items-center justify-between">
-        <span className="text-[12px] font-semibold text-[#3A3D37]">{mode === 'demo' ? '当前：示例数据' : '当前：我的账本'}</span>
-        <span className="text-[11px] font-semibold text-[#0B6357]">{mode === 'demo' ? '切到个人 →' : '看示例 →'}</span>
-      </div>
-      <p className="mt-1 text-[10.5px] leading-relaxed text-[#8A887F]">
-        {mode === 'demo' ? '合成数据，仅用于体验；个人库独立保存' : '数据仅存本机浏览器，不上传'}
-      </p>
-    </button>
-  );
-}
-
 export function AppShell({ children }: { children: ReactNode }) {
-  const mode = useAppStore((s) => s.mode);
   const user = useAppStore((s) => s.user);
   const logout = useAppStore((s) => s.logout);
   const navigate = useNavigate();
@@ -92,7 +70,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
         <div className="mt-4 space-y-2">
-          <ModeButton />
           {user && (
             <div className="flex items-center justify-between gap-2 rounded-xl border border-[#E4E0D8] bg-white px-3 py-2.5" data-testid="user-chip">
               <div className="flex min-w-0 items-center gap-2">
@@ -116,7 +93,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-[#E7E3DA] bg-[#F7F5F1]/85 px-4 py-3 backdrop-blur lg:hidden">
           <Brand />
           <div className="flex items-center gap-2">
-            <span className={cn('chip', mode === 'demo' ? 'chip-amber' : 'chip-teal')}>{mode === 'demo' ? '示例' : '个人'}</span>
+            <span className="chip chip-teal">本机账本</span>
             <button type="button" className="btn btn-secondary btn-sm !p-2" aria-label="打开更多导航" onClick={() => setMoreOpen(true)}>
               <Menu size={17} />
             </button>

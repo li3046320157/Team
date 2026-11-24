@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { BrainCircuit, Database, Download, FileJson, FileSpreadsheet, HardDriveDownload, History, RotateCcw, ShieldAlert, Trash2, Upload } from 'lucide-react';
+import { BrainCircuit, Download, FileJson, FileSpreadsheet, HardDriveDownload, History, RotateCcw, ShieldAlert, Trash2, Upload } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { formatCN, todayISO } from '../domain/days';
 import { formatMoney } from '../domain/money';
@@ -14,7 +14,6 @@ import { weekdayCN } from '../lib/ui';
 export function DataCenterPage() {
   const mode = useAppStore((s) => s.mode);
   const dataset = useAppStore((s) => s.dataset)!;
-  const switchMode = useAppStore((s) => s.switchMode);
   const replaceDataset = useAppStore((s) => s.replaceDataset);
   const resetMode = useAppStore((s) => s.resetMode);
   const runCalibration = useAppStore((s) => s.runCalibration);
@@ -38,13 +37,13 @@ export function DataCenterPage() {
 
   const exportBackup = () => {
     const content = createBackup(dataset);
-    downloadTextFile(`moneyflow-backup-${mode}-${today}.json`, content, 'application/json;charset=utf-8');
+    downloadTextFile(`moneyflow-backup-${today}.json`, content, 'application/json;charset=utf-8');
     notify('备份文件已开始下载，请妥善保存', 'success');
   };
 
   const exportCSV = () => {
     const content = transactionsToCSV(dataset);
-    downloadTextFile(`moneyflow-transactions-${mode}-${today}.csv`, content, 'text/csv;charset=utf-8');
+    downloadTextFile(`moneyflow-transactions-${today}.csv`, content, 'text/csv;charset=utf-8');
     notify(`已导出 ${dataset.transactions.length} 笔交易`, 'success');
   };
 
@@ -73,12 +72,9 @@ export function DataCenterPage() {
     setBusy('restore');
     const restored = {
       ...importResult.dataset,
-      meta: { ...importResult.dataset.meta, restoredAt: new Date().toISOString() },
+      meta: { ...importResult.dataset.meta, kind: 'personal' as const, demoDate: undefined, restoredAt: new Date().toISOString() },
     };
     try {
-      if (restored.meta.kind !== mode) {
-        await switchMode(restored.meta.kind);
-      }
       const ok = await replaceDataset(restored, '备份已恢复（覆盖了当前数据集）');
       if (ok) {
         setImportResult(null);
@@ -168,39 +164,7 @@ export function DataCenterPage() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Card title="数据模式" subtitle={`当前：${mode === 'demo' ? '示例数据' : '个人数据'} · 两套数据独立存储，切换不会互相覆盖`}>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {(['personal', 'demo'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => void switchMode(m)}
-                disabled={m === mode}
-                className={cn(
-                  'rounded-xl border px-3 py-2.5 text-left transition-all',
-                  m === mode ? 'border-[#0E7568] bg-[#F0F8F5]' : 'border-[#E4E0D8] bg-white hover:border-[#BFE0D7]',
-                )}
-              >
-                <p className="flex items-center gap-1.5 text-[12.5px] font-semibold">
-                  <Database size={13} /> {m === 'demo' ? '示例数据' : '个人数据'}
-                  {m === mode && <Badge tone="teal">使用中</Badge>}
-                </p>
-                <p className="mt-0.5 text-[10.5px] leading-relaxed text-[#8A887F]">
-                  {m === 'demo' ? '合成账单，按今天重新生成，便于体验全部功能' : '你自己的账本，备份前请先导出 JSON'}
-                </p>
-              </button>
-            ))}
-          </div>
-          <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-[#FAF8F3] px-3 py-2">
-            <p className="text-[10.5px] text-[#8A887F]">
-              数据创建于 {formatCN(dataset.meta.createdAt.slice(0, 10))}
-              {dataset.meta.restoredAt ? ` · 上次恢复 ${new Date(dataset.meta.restoredAt).toLocaleString('zh-CN')}` : ''}
-            </p>
-            <Button size="xs" variant="danger" onClick={() => setConfirmReset(true)}><RotateCcw size={12} /> 重置当前</Button>
-          </div>
-        </Card>
-
-        <Card title="JSON 完整备份" subtitle="包含账本、计划、目标、快照与校准；恢复会覆盖当前同模式数据集">
+        <Card title="JSON 完整备份" subtitle="包含账本、计划、目标、快照与校准；恢复会覆盖当前数据集">
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={exportBackup}><Download size={14} /> 下载备份</Button>
             <Button variant="secondary" onClick={() => fileRef.current?.click()} data-testid="import-backup"><Upload size={14} /> 选择备份文件</Button>
@@ -220,7 +184,6 @@ export function DataCenterPage() {
               </div>
               {importResult.preview && (
                 <div className="mt-2 grid grid-cols-3 gap-2 text-[10.5px] text-[#6B6A63]">
-                  <p>模式：{importResult.preview.mode === 'demo' ? '示例' : '个人'}</p>
                   <p>账户：{importResult.preview.accounts}</p>
                   <p>交易：{importResult.preview.transactions}</p>
                   <p>计划：{importResult.preview.flows}</p>
@@ -247,9 +210,7 @@ export function DataCenterPage() {
                   data-testid="confirm-restore"
                 >
                   <HardDriveDownload size={13} />
-                  {importResult.preview?.mode !== mode
-                    ? `切换到${importResult.preview?.mode === 'demo' ? '示例' : '个人'}模式并覆盖导入`
-                    : '覆盖当前数据集'}
+                  覆盖当前数据集
                 </Button>
               )}
             </div>
@@ -360,8 +321,8 @@ export function DataCenterPage() {
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#F3D9D5] bg-[#FDF7F6] px-3 py-2.5">
               <div>
-                <p className="text-[12px] font-medium text-[#98362E]">重置{mode === 'demo' ? '示例数据' : '个人数据'}</p>
-                <p className="text-[10.5px] text-[#8A887F]">{mode === 'demo' ? '删除当前示例并重新生成今天的演示账本。' : '清空个人账本并回到开户引导，另一模式不受影响。'}</p>
+                <p className="text-[12px] font-medium text-[#98362E]">重置个人数据</p>
+                <p className="text-[10.5px] text-[#8A887F]">清空个人账本并回到开户引导，账户与配置会一并重置。</p>
               </div>
               <Button size="sm" variant="danger" onClick={() => setConfirmReset(true)}><Trash2 size={13} /> 重置</Button>
             </div>
@@ -375,7 +336,7 @@ export function DataCenterPage() {
 
       <Modal
         open={confirmReset}
-        title={`重置${mode === 'demo' ? '示例数据' : '个人数据'}？`}
+        title="重置个人数据？"
         subtitle="当前数据集将被永久删除，建议先导出 JSON 备份。"
         onClose={() => setConfirmReset(false)}
         footer={(
@@ -386,9 +347,7 @@ export function DataCenterPage() {
         )}
       >
         <p className="text-[12px] leading-relaxed text-[#6B6A63]">
-          {mode === 'demo'
-            ? '重置后会立即按今天重新生成一份合成演示数据，适合重新体验完整流程。'
-            : '个人数据将被清空并重新进入开户设置。该操作无法通过应用内撤销，只能从备份恢复。'}
+          个人数据将被清空并重新进入开户设置。该操作无法通过应用内撤销，只能从备份恢复。
         </p>
       </Modal>
 

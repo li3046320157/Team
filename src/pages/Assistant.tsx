@@ -187,7 +187,7 @@ export function AssistantPage() {
         >
           {configOpen ? (
             <div className="space-y-3.5">
-              <Field label="API 访问地址" hint="填到 /v1 这一级即可，例如 https://api.openai.com/v1 或中转地址">
+              <Field label="API 访问地址" hint="填到 /v1 这一级即可，例如 https://api.openai.com/v1；该地址必须允许浏览器跨域（CORS）访问">
                 <div className="relative">
                   <Link2 size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#A3A097]" />
                   <input className="input !pl-8" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" data-testid="ai-base" />
@@ -209,7 +209,7 @@ export function AssistantPage() {
                   </button>
                 </div>
               </Field>
-              <Field label="模型名称" hint="可手动填写，或从该接口拉取可用模型">
+              <Field label="模型名称" hint="可手动填写；若拉取失败（常见原因是服务端未开放跨域），直接填模型名也能对话">
                 <input className="input" value={model} onChange={(e) => setModel(e.target.value)} placeholder="如 gpt-4o-mini / deepseek-chat" list="ai-model-options" data-testid="ai-model" />
                 <datalist id="ai-model-options">
                   {modelOptions.map((id) => <option key={id} value={id} />)}
@@ -223,7 +223,7 @@ export function AssistantPage() {
                 </Button>
               </div>
               <InfoNote tone="warn">
-                密钥与对话只存本机；分析请求由浏览器直接发往你填写的地址，请确认该服务可信。部分接口不允许浏览器跨域访问，如遇连接失败可更换支持 CORS 的中转地址。
+                密钥与对话只存本机；分析请求由浏览器直接发往你填写的地址，请确认该服务可信。如果地址没有返回跨域许可（CORS），浏览器会直接拦截请求，网页端无法绕过；请更换支持 CORS 的官方接口或中转，也可以先手动填写模型名保存配置。
               </InfoNote>
             </div>
           ) : (
@@ -235,7 +235,7 @@ export function AssistantPage() {
           )}
         </Card>
 
-        <Card title="分析对话" subtitle={mode === 'demo' ? '当前分析的是合成示例数据' : '基于你本机账本的实时摘要'} className="flex flex-col">
+        <Card title="分析对话" subtitle="基于你本机账本的实时摘要" className="flex flex-col">
           <div ref={scrollRef} className="scroll-thin mb-3 h-[420px] space-y-3 overflow-y-auto rounded-xl border border-[#EFECE6] bg-[#FCFBF7] p-4">
             {messages.length === 0 && (
               <div className="flex h-full flex-col items-center justify-center gap-3 text-center">

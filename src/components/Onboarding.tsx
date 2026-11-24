@@ -6,7 +6,6 @@ import { useAppStore } from '../store/useAppStore';
 import { Button, Field } from './ui';
 
 export function Onboarding() {
-  const switchMode = useAppStore((s) => s.switchMode);
   const complete = useAppStore((s) => s.completeOnboarding);
   const loading = useAppStore((s) => s.loading);
   const [accountName, setAccountName] = useState('');
@@ -64,7 +63,7 @@ export function Onboarding() {
           </p>
           <ul className="mt-6 space-y-3.5">
             {[
-              { icon: ShieldCheck, title: '本地优先，不上传账单', desc: '使用 IndexedDB 存储；导出备份由你控制，演示数据完全合成。' },
+              { icon: ShieldCheck, title: '本地优先，不上传账单', desc: '使用浏览器 IndexedDB 存储；导出备份由你控制。' },
               { icon: Wallet, title: '整数分记账，余额守恒', desc: '收入、支出、转账与目标预留分开建模，不出现浮点误差。' },
               { icon: Sparkles, title: '预测标注假设与来源', desc: '历史不足时明确「未估计」；校准与回测结果如实展示。' },
             ].map((item) => (
@@ -109,17 +108,8 @@ export function Onboarding() {
               {saving ? '正在建立…' : '开始记账'}
               {!saving && <ArrowRight size={15} />}
             </Button>
-            <button
-              type="button"
-              className="w-full rounded-xl border border-[#E4E0D8] bg-[#FAF8F3] px-4 py-3 text-[12.5px] font-semibold text-[#0B6357] transition hover:border-[#CFC9BD]"
-              onClick={() => void switchMode('demo')}
-              disabled={loading}
-              data-testid="load-demo"
-            >
-              先查看 6 个月合成示例数据
-            </button>
             <p className="text-center text-[10.5px] leading-relaxed text-[#A3A097]">
-              示例数据随机生成，不对应任何真实个人；个人账本与示例账本相互隔离。
+              建立后可在「流水」页记账，在「设置」页随时调整账户与安全线。
             </p>
           </div>
         </div>

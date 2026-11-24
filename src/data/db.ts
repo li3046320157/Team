@@ -82,41 +82,12 @@ function dbFor(mode: DataMode): MoneyFlowDB {
   return dbs[mode] as MoneyFlowDB;
 }
 
-/** 首个账户注册时，把旧版共享个人库的数据迁入当前用户库（迁移后清空旧库，避免重复认领）。 */
-export async function adoptLegacyPersonalData(): Promise<boolean> {
-  if (personalDbName === LEGACY_PERSONAL_DB) return false;
-  const target = dbFor('personal');
-  if (await target.meta.get(1)) return false;
-  const legacy = new MoneyFlowDB(LEGACY_PERSONAL_DB);
-  try {
-    if (!(await legacy.meta.get(1))) return false;
-    const dataset = await readFromDb(legacy);
-    if (!dataset) return false;
-    await writeToDb(target, dataset);
-    await legacy.delete();
-    return true;
-  } finally {
-    legacy.close();
-  }
-}
-
-export const MODE_STORAGE_KEY = 'moneyflow.mode';
-
-export function readStoredMode(): DataMode {
-  try {
-    const v = localStorage.getItem(MODE_STORAGE_KEY);
-    return v === 'demo' ? 'demo' : 'personal';
-  } catch {
-    return 'personal';
-  }
-}
-
-export function storeMode(mode: DataMode): void {
-  try {
-    localStorage.setItem(MODE_STORAGE_KEY, mode);
-  } catch {
-    /* 忽略隐私模式下的存储失败 */
-  }
+/** 关闭所有已打开的数据库连接，供本机数据清理使用。 */
+export function closeAllDbs(): void {
+  dbs.personal?.close();
+  dbs.demo?.close();
+  dbs.personal = null;
+  dbs.demo = null;
 }
 
 async function readFromDb(db: MoneyFlowDB): Promise<Dataset | null> {

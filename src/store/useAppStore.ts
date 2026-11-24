@@ -2,10 +2,10 @@
 import { create } from 'zustand';
 import type { Dataset, DataMode } from '../domain/types';
 import { todayISO } from '../domain/days';
-import { clearDataset, describeDbError, readDataset, readStoredMode, storeMode, writeDataset, setPersonalDbName, adoptLegacyPersonalData } from '../data/db';
+import { clearDataset, describeDbError, readDataset, writeDataset, setPersonalDbName } from '../data/db';
 import { clearSession, getUserById, loginUser, personalDbNameFor, readSession, registerUser, storeSession, type AuthUser } from '../data/auth';
 import { createEmptyDataset } from '../data/defaults';
-import { generateDemoDataset } from '../data/demo';
+import { applyCleanSlateOnce } from '../data/wipe';
 import { addAccount, applyOnboarding, type AccountInput } from '../services/mutations';
 import { runCalibrationOnDataset, saveDailySnapshot, saveManualSnapshot, type CalibrationOutcome } from '../services/snapshots';
 
@@ -30,7 +30,6 @@ interface AppState {
   login: (username: string, password: string) => Promise<string | null>;
   logout: () => void;
   init: () => Promise<void>;
-  switchMode: (mode: DataMode) => Promise<void>;
   apply: (mutator: (dataset: Dataset) => Dataset, successMessage?: string) => Promise<boolean>;
   replaceDataset: (dataset: Dataset, successMessage?: string) => Promise<boolean>;
   refresh: () => Promise<void>;
@@ -85,22 +84,15 @@ async function withWriteLock<T>(mode: DataMode, fn: () => Promise<T>): Promise<T
 async function prepareDataset(mode: DataMode): Promise<Dataset> {
   const today = todayISO();
   let dataset = await readDataset(mode);
-  if (mode === 'demo') {
-    if (!dataset || dataset.meta.demoDate !== today) {
-      dataset = generateDemoDataset(today);
-      await writeDataset(mode, dataset);
-    }
-    return dataset;
-  }
   if (!dataset) {
-    dataset = createEmptyDataset('personal', today);
+    dataset = createEmptyDataset(mode, today);
     await writeDataset(mode, dataset);
   }
   return dataset;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
-  mode: readStoredMode(),
+  mode: 'personal',
   user: null,
   authReady: false,
   dataset: null,
@@ -110,6 +102,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   toast: null,
 
   boot: async () => {
+    await applyCleanSlateOnce();
     setupChannel();
     const sessionId = readSession();
     const user = sessionId ? await getUserById(sessionId).catch(() => null) : null;
@@ -131,11 +124,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const user = await loginUser(username, password);
       setPersonalDbName(personalDbNameFor(user.id));
-      const migrated = await adoptLegacyPersonalData();
       storeSession(user.id);
       set({ user, error: null });
       await get().init();
-      get().notify(migrated ? `欢迎回来，${user.username}；已迁入本机原有账本数据` : `欢迎回来，${user.username}`, 'success');
+      get().notify(`欢迎回来，${user.username}`, 'success');
       return null;
     } catch (error) {
       return error instanceof Error ? error.message : '登录失败，请重试';
@@ -160,19 +152,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ dataset, loading: false, ready: true });
     } catch (error) {
       set({ loading: false, error: describeDbError(error), ready: true });
-    }
-  },
-
-  switchMode: async (mode) => {
-    if (mode === get().mode) return;
-    set({ loading: true, error: null });
-    try {
-      const dataset = await prepareDataset(mode);
-      storeMode(mode);
-      set({ mode, dataset, loading: false, ready: true });
-      broadcast(mode);
-    } catch (error) {
-      set({ loading: false, error: describeDbError(error) });
     }
   },
 
@@ -282,7 +261,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const dataset = await prepareDataset(mode);
         set({ dataset });
       }
-      get().notify(mode === 'demo' ? '示例数据已重置' : '个人数据已清空', 'success');
+      get().notify('个人数据已清空', 'success');
       broadcast(mode);
     } catch (error) {
       get().notify(describeDbError(error), 'error');

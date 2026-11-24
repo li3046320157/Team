@@ -2,13 +2,22 @@ import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
+  Bot,
+  Calendar,
   CalendarClock,
   CheckCircle2,
   ChevronRight,
   CircleDollarSign,
+  Database,
+  FlaskConical,
+  LayoutDashboard,
+  LineChart,
+  List,
   Plus,
   ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
+  Target,
   TrendingDown,
   TrendingUp,
   Wallet,
@@ -21,12 +30,24 @@ import { runForecast } from '../domain/forecasting/engine';
 import { buildOccurrenceViews } from '../domain/occurrences';
 import { formatMoneyShort } from '../domain/money';
 import { EChart } from '../components/Chart';
-import { Badge, Button, Card, EmptyState, Money, PageHeader, Progress, StatCard, cn } from '../components/ui';
+import { Badge, Button, Card, EmptyState, Money, Progress, StatCard, cn } from '../components/ui';
 import { dueLabel, monthLabel, riskText } from '../lib/ui';
+
+const FEATURES = [
+  { to: '/', icon: LayoutDashboard, title: '总览', desc: '今天余额、本月收支、今日待办与 90 天风险状态一眼看清。' },
+  { to: '/ledger', icon: List, title: '流水', desc: '表单或一句话速记，收入、支出、转账都记在同一本账。' },
+  { to: '/schedules', icon: Calendar, title: '计划', desc: '房租、订阅等固定收支建成计划，到期一键核销为真实流水。' },
+  { to: '/insights', icon: Sparkles, title: '洞察', desc: '聚合高频小额、标出异常消费，并从历史中识别周期收支。' },
+  { to: '/forecast', icon: LineChart, title: '预测', desc: '滚动预测未来 90 天余额，并明确标注假设、来源与限制。' },
+  { to: '/assistant', icon: Bot, title: 'AI 分析', desc: '自带 API 密钥，让模型基于你的账本摘要给出可执行建议。' },
+  { to: '/sandbox', icon: FlaskConical, title: '决策沙盘', desc: '大额消费前先模拟：立即买、延后买、分阶段买的影响对比。' },
+  { to: '/goals', icon: Target, title: '目标', desc: '为旅行、应急金等目标预留资金，进度与截止日一目了然。' },
+  { to: '/data', icon: Database, title: '数据中心', desc: '备份、恢复、导出 CSV，回看历史快照与校准结果。' },
+  { to: '/settings', icon: SlidersHorizontal, title: '设置', desc: '维护账户、安全储备线与预算，参数即时影响预测。' },
+];
 
 export function DashboardPage() {
   const dataset = useAppStore((s) => s.dataset)!;
-  const mode = useAppStore((s) => s.mode);
   const navigate = useNavigate();
   const today = todayISO();
   const month = today.slice(0, 7);
@@ -138,24 +159,82 @@ export function DashboardPage() {
 
   return (
     <div className="fade-in" data-testid="dashboard">
-      <PageHeader
-        title={mode === 'demo' ? '示例总览' : '今天，钱流如何'}
-        description={
-          <>
-            你的财务主页：今天余额、本月收支、待办与未来走势一目了然。{formatCN(today)} · {monthLabel(month)}。{mode === 'demo' ? '当前展示合成示例数据，个人账本独立保存。' : '所有预测基于本机账本，预测不是收益承诺。'}
-          </>
-        }
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => navigate('/sandbox')}>
-              <Sparkles size={15} /> 消费沙盘
-            </Button>
-            <Button variant="primary" onClick={() => navigate('/ledger?quick=1')} data-testid="quick-add">
-              <Plus size={15} /> 记一笔
-            </Button>
-          </>
-        }
-      />
+      <section className="card overflow-hidden" aria-labelledby="intro-heading">
+        <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[1.25fr_0.75fr]">
+          <div>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#E3F1ED] px-2.5 py-1 text-[10.5px] font-semibold text-[#0B6357]">
+              <Sparkles size={12} /> 关于 MoneyFlow 钱流
+            </span>
+            <h1 id="intro-heading" className="mt-3 text-[25px] font-semibold leading-[1.25] tracking-[-0.02em] sm:text-[30px]">
+              花钱之前，先把未来 90 天的现金流看清楚。
+            </h1>
+            <p className="mt-3 max-w-2xl text-[13px] leading-relaxed text-[#5F5E57]">
+              我们做这套系统，是因为「这个月钱去哪了」「下个月会不会透支」不该靠猜。MoneyFlow 把真实流水、固定计划与目标预留放进同一本本地账本，
+              用可解释的模型给出余额预测，让你在做大额消费之前就能评估影响，而不是月底才后悔。
+            </p>
+            <p className="mt-2 max-w-2xl text-[12px] leading-relaxed text-[#8A887F]">
+              所有账户与账单只保存在本机浏览器（IndexedDB），不上传服务器；预测只是规划参考，不构成收益承诺。
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <Button variant="primary" onClick={() => navigate('/ledger?quick=1')} data-testid="quick-add">
+                <Plus size={15} /> 记一笔
+              </Button>
+              <Button variant="secondary" onClick={() => navigate('/sandbox')}>
+                <Sparkles size={15} /> 消费沙盘
+              </Button>
+              <span className="chip chip-teal">本地优先</span>
+              <span className="chip">整数分记账</span>
+              <span className="chip">可解释预测</span>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-[#E9E4DA] bg-[#FAF8F3] p-4">
+            <p className="text-[12px] font-semibold text-[#3A3D37]">推荐使用顺序</p>
+            <ol className="mt-2.5 space-y-2 text-[11.5px] leading-relaxed text-[#6B6A63]">
+              <li><span className="num mr-1.5 font-semibold text-[#0B6357]">1</span>建立账户，填写期初余额与安全储备线</li>
+              <li><span className="num mr-1.5 font-semibold text-[#0B6357]">2</span>记录流水，把房租等固定收支建成计划</li>
+              <li><span className="num mr-1.5 font-semibold text-[#0B6357]">3</span>看预测与洞察，用沙盘评估大额消费</li>
+              <li><span className="num mr-1.5 font-semibold text-[#0B6357]">4</span>为目标预留资金，按节奏沉淀储蓄</li>
+            </ol>
+            <p className="mt-3 rounded-lg bg-white/70 px-2.5 py-2 text-[10.5px] leading-relaxed text-[#8A887F]">
+              不需要一次填完：先记今天的一笔，系统会随数据逐步校准。
+            </p>
+          </div>
+        </div>
+        <div className="border-t border-[#EFECE6] p-5 sm:p-7">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <h2 className="text-[15px] font-semibold">全部功能 · 每个模块解决什么问题</h2>
+            <p className="text-[10.5px] text-[#8A887F]">点击卡片进入对应页面</p>
+          </div>
+          <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {FEATURES.map((feature) => (
+              <li key={feature.title}>
+                <Link to={feature.to} className="flex h-full gap-2.5 rounded-xl border border-[#EFECE6] bg-[#FCFBF8] p-3 transition hover:border-[#BFE0D7] hover:bg-[#F7FBF9]">
+                  <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#E3F1ED] text-[#0B6357]">
+                    <feature.icon size={15} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-1 text-[12.5px] font-semibold">
+                      {feature.title}
+                      <ChevronRight size={12} className="text-[#A3A097]" />
+                    </span>
+                    <span className="mt-0.5 block text-[10.5px] leading-relaxed text-[#7A786F]">{feature.desc}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <div className="mb-3 mt-6 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h2 className="text-[20px] font-semibold tracking-[-0.01em]">账本速览</h2>
+          <p className="mt-1 text-[12px] text-[#8A887F]">{formatCN(today)} · {monthLabel(month)} · 总余额、待办与未来走势</p>
+        </div>
+        <Link to="/forecast" className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#0B6357] hover:underline">
+          查看完整预测 <ChevronRight size={14} />
+        </Link>
+      </div>
 
       {noAccounts ? (
         <Card>
