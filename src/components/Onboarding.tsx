@@ -9,10 +9,10 @@ export function Onboarding() {
   const switchMode = useAppStore((s) => s.switchMode);
   const complete = useAppStore((s) => s.completeOnboarding);
   const loading = useAppStore((s) => s.loading);
-  const [accountName, setAccountName] = useState('日常账户');
-  const [opening, setOpening] = useState('0');
-  const [safety, setSafety] = useState('5000');
-  const [budget, setBudget] = useState('3000');
+  const [accountName, setAccountName] = useState('');
+  const [opening, setOpening] = useState('');
+  const [safety, setSafety] = useState('');
+  const [budget, setBudget] = useState('');
   const [coverageStart, setCoverageStart] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -33,7 +33,7 @@ export function Onboarding() {
     if (bud === null) return setError('月预算格式无效（可填 0）');
     setSaving(true);
     const ok = await complete({
-      accountName,
+      accountName: accountName.trim() || '日常账户',
       openingBalance: open,
       safetyReserve: safe,
       monthVariableBudget: bud,
@@ -87,18 +87,18 @@ export function Onboarding() {
           <div className="mt-5 space-y-3.5">
             <div className="grid grid-cols-2 gap-3">
               <Field label="主账户名称">
-                <input className="input" value={accountName} maxLength={20} onChange={(e) => setAccountName(e.target.value)} />
+                <input className="input" value={accountName} maxLength={20} onChange={(e) => setAccountName(e.target.value)} placeholder="例如：日常账户（留空用默认名）" />
               </Field>
               <Field label="期初余额（元）">
                 <input className="input num" inputMode="decimal" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0.00" />
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="安全储备（元）" hint="低于这条线会提示风险">
-                <input className="input num" inputMode="decimal" value={safety} onChange={(e) => setSafety(e.target.value)} />
+              <Field label="安全储备（元）" hint="低于这条线会提示风险，例如 5000；可留空表示不设">
+                <input className="input num" inputMode="decimal" value={safety} onChange={(e) => setSafety(e.target.value)} placeholder="例如：5000" />
               </Field>
-              <Field label="月可变预算（元）" hint="可留空，用历史估计">
-                <input className="input num" inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} />
+              <Field label="月可变预算（元）" hint="可留空，用历史估计，例如 3000">
+                <input className="input num" inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="例如：3000" />
               </Field>
             </div>
             <Field label="已整理完整的起始日期（可选）" hint={`留空表示从今天开始整理。最晚 ${today}。`}>

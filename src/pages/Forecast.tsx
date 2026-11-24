@@ -132,7 +132,7 @@ export function ForecastPage() {
     <div className="fade-in" data-testid="forecast">
       <PageHeader
         title="现金流预测"
-        description="同一条引擎同时服务于总览、沙盘与目标投影。假设、覆盖率、可变估计来源与校准状态全部可见。"
+        description="推算未来 30/60/90 天每天的余额，提前发现钱不够用的日子。同一条引擎同时服务于总览、沙盘与目标投影。假设、覆盖率、可变估计来源与校准状态全部可见。"
         actions={
           <>
             <Segmented<'30' | '60' | '90'>

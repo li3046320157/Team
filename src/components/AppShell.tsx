@@ -1,18 +1,21 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
+  Bot,
   Calendar,
   Database,
   FlaskConical,
   LayoutDashboard,
   LineChart,
   List,
+  LogOut,
   Menu,
   MoreHorizontal,
   Plus,
   Settings,
   Sparkles,
   Target,
+  UserRound,
   X,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
@@ -24,6 +27,7 @@ const NAV = [
   { to: '/schedules', label: '计划', icon: Calendar },
   { to: '/insights', label: '洞察', icon: Sparkles },
   { to: '/forecast', label: '预测', icon: LineChart },
+  { to: '/assistant', label: 'AI 分析', icon: Bot },
   { to: '/sandbox', label: '决策沙盘', icon: FlaskConical },
   { to: '/goals', label: '目标', icon: Target },
   { to: '/data', label: '数据中心', icon: Database },
@@ -68,6 +72,8 @@ function ModeButton() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const mode = useAppStore((s) => s.mode);
+  const user = useAppStore((s) => s.user);
+  const logout = useAppStore((s) => s.logout);
   const navigate = useNavigate();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -87,6 +93,17 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
         <div className="mt-4 space-y-2">
           <ModeButton />
+          {user && (
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-[#E4E0D8] bg-white px-3 py-2.5" data-testid="user-chip">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#E3F1ED] text-[#0B6357]"><UserRound size={14} /></div>
+                <span className="truncate text-[12px] font-semibold text-[#3A3D37]">{user.username}</span>
+              </div>
+              <button type="button" className="btn btn-ghost btn-xs shrink-0" onClick={logout} aria-label="退出登录" data-testid="logout">
+                <LogOut size={13} /> 退出
+              </button>
+            </div>
+          )}
           <p className="px-1 text-[10.5px] leading-relaxed text-[#A3A097]">
             整数分计算 · 本地 IndexedDB
             <br />
@@ -106,7 +123,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1180px] px-4 pb-28 pt-5 sm:px-6 lg:pb-12 lg:pt-8">{children}</main>
+        <main className="mx-auto w-full max-w-[1180px] px-4 pb-28 pt-5 sm:px-6 lg:pb-12 lg:pt-8">
+          <div key={location.pathname} className="page-enter">{children}</div>
+        </main>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E7E3DA] bg-[#FBF9F4]/95 backdrop-blur lg:hidden" aria-label="底部导航">
@@ -170,6 +189,17 @@ export function AppShell({ children }: { children: ReactNode }) {
                 关闭
               </button>
             </div>
+            {user && (
+              <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-[#E4E0D8] bg-[#FAF8F3] px-3 py-2.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <UserRound size={15} className="shrink-0 text-[#0B6357]" />
+                  <span className="truncate text-[12.5px] font-semibold">{user.username}</span>
+                </div>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setMoreOpen(false); logout(); }}>
+                  <LogOut size={14} /> 退出登录
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

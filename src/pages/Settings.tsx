@@ -133,7 +133,7 @@ export function SettingsPage() {
     <div className="fade-in" data-testid="settings">
       <PageHeader
         title="设置"
-        description="参数会影响预测、异常检测、周期识别、目标分配与沙盘。所有金额以整数分存储。"
+        description="调整安全线、月预算、账户和检测参数，让预测与提醒更符合你的实际情况。参数会影响预测、异常检测、周期识别、目标分配与沙盘。所有金额以整数分存储。"
         actions={(
           <>
             {savedAt && <Badge tone="teal"><Check size={11} /> {savedAt} 已保存</Badge>}

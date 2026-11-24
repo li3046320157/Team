@@ -46,7 +46,7 @@ export function InsightsPage() {
     <div className="fade-in" data-testid="insights">
       <PageHeader
         title="洞察"
-        description="所有识别都可查看证据。周期识别是规则匹配程度而非概率；异常检测只用当天之前的历史。"
+        description="自动帮你发现异常大额消费、疑似周期性订阅与小额高频支出，每条都附证据。周期识别是规则匹配程度而非概率；异常检测只用当天之前的历史。"
         actions={<Badge tone="teal"><Sparkles size={11} /> 本地计算</Badge>}
       />
 

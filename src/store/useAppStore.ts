@@ -2,7 +2,8 @@
 import { create } from 'zustand';
 import type { Dataset, DataMode } from '../domain/types';
 import { todayISO } from '../domain/days';
-import { clearDataset, describeDbError, readDataset, readStoredMode, storeMode, writeDataset } from '../data/db';
+import { clearDataset, describeDbError, readDataset, readStoredMode, storeMode, writeDataset, setPersonalDbName, adoptLegacyPersonalData } from '../data/db';
+import { clearSession, getUserById, loginUser, personalDbNameFor, readSession, registerUser, storeSession, type AuthUser } from '../data/auth';
 import { createEmptyDataset } from '../data/defaults';
 import { generateDemoDataset } from '../data/demo';
 import { addAccount, applyOnboarding, type AccountInput } from '../services/mutations';
@@ -17,11 +18,17 @@ interface Toast {
 
 interface AppState {
   mode: DataMode;
+  user: AuthUser | null;
+  authReady: boolean;
   dataset: Dataset | null;
   loading: boolean;
   ready: boolean;
   error: string | null;
   toast: Toast | null;
+  boot: () => Promise<void>;
+  register: (username: string, password: string) => Promise<string | null>;
+  login: (username: string, password: string) => Promise<string | null>;
+  logout: () => void;
   init: () => Promise<void>;
   switchMode: (mode: DataMode) => Promise<void>;
   apply: (mutator: (dataset: Dataset) => Dataset, successMessage?: string) => Promise<boolean>;
@@ -52,17 +59,18 @@ let toastTimer: ReturnType<typeof setTimeout> | null = null;
 function setupChannel(): void {
   if (channel || typeof BroadcastChannel === 'undefined') return;
   channel = new BroadcastChannel(CHANNEL_NAME);
-  channel.onmessage = (event: MessageEvent<{ mode?: DataMode; source?: string }>) => {
+  channel.onmessage = (event: MessageEvent<{ mode?: DataMode; source?: string; uid?: string | null }>) => {
     const data = event.data;
     if (!data || data.source === TAB_ID) return;
     const state = useAppStore.getState();
+    if ((data.uid ?? null) !== (state.user?.id ?? null)) return;
     if (data.mode === state.mode) void state.refresh();
   };
 }
 
 function broadcast(mode: DataMode): void {
   try {
-    channel?.postMessage({ mode, source: TAB_ID });
+    channel?.postMessage({ mode, source: TAB_ID, uid: useAppStore.getState().user?.id ?? null });
   } catch {
     /* 广播失败不影响写入 */
   }
@@ -93,14 +101,63 @@ async function prepareDataset(mode: DataMode): Promise<Dataset> {
 
 export const useAppStore = create<AppState>((set, get) => ({
   mode: readStoredMode(),
+  user: null,
+  authReady: false,
   dataset: null,
   loading: false,
   ready: false,
   error: null,
   toast: null,
 
+  boot: async () => {
+    setupChannel();
+    const sessionId = readSession();
+    const user = sessionId ? await getUserById(sessionId).catch(() => null) : null;
+    if (user) setPersonalDbName(personalDbNameFor(user.id));
+    set({ user, authReady: true });
+    if (user) await get().init();
+  },
+
+  register: async (username, password) => {
+    try {
+      const user = await registerUser(username, password);
+      setPersonalDbName(personalDbNameFor(user.id));
+      const migrated = await adoptLegacyPersonalData();
+      storeSession(user.id);
+      set({ user, error: null });
+      await get().init();
+      get().notify(migrated ? '注册成功，已迁入本机原有账本数据' : '注册成功，欢迎使用 MoneyFlow', 'success');
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : '注册失败，请重试';
+    }
+  },
+
+  login: async (username, password) => {
+    try {
+      const user = await loginUser(username, password);
+      setPersonalDbName(personalDbNameFor(user.id));
+      storeSession(user.id);
+      set({ user, error: null });
+      await get().init();
+      get().notify(`欢迎回来，${user.username}`, 'success');
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : '登录失败，请重试';
+    }
+  },
+
+  logout: () => {
+    clearSession();
+    setPersonalDbName('moneyflow-personal');
+    set({ user: null, dataset: null, ready: false, loading: false, error: null });
+    get().notify('已退出登录', 'info');
+  },
+
   init: async () => {
     setupChannel();
+    const state = get();
+    if (state.mode === 'personal' && !state.user) return;
     set({ loading: true, error: null });
     try {
       const mode = get().mode;

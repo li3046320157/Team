@@ -142,7 +142,7 @@ export function DashboardPage() {
         title={mode === 'demo' ? '示例总览' : '今天，钱流如何'}
         description={
           <>
-            {formatCN(today)} · {monthLabel(month)}。{mode === 'demo' ? '当前展示合成示例数据，个人账本独立保存。' : '所有预测基于本机账本，预测不是收益承诺。'}
+            你的财务主页：今天余额、本月收支、待办与未来走势一目了然。{formatCN(today)} · {monthLabel(month)}。{mode === 'demo' ? '当前展示合成示例数据，个人账本独立保存。' : '所有预测基于本机账本，预测不是收益承诺。'}
           </>
         }
         actions={

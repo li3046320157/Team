@@ -326,3 +326,181 @@ table.data tbody tr:hover {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---- 动态认证页 ---- */
+.auth-scene {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+.auth-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+.auth-blob-teal {
+  width: 480px;
+  height: 480px;
+  left: -120px;
+  top: -140px;
+  background: radial-gradient(circle, rgba(14, 117, 104, 0.35), transparent 70%);
+  animation: blobDrift calc(16s * var(--site-motion, 1)) ease-in-out infinite alternate;
+}
+.auth-blob-amber {
+  width: 420px;
+  height: 420px;
+  right: -100px;
+  bottom: -120px;
+  background: radial-gradient(circle, rgba(183, 121, 31, 0.3), transparent 70%);
+  animation: blobDrift calc(19s * var(--site-motion, 1)) ease-in-out infinite alternate-reverse;
+}
+@keyframes blobDrift {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(60px, 40px) scale(1.15);
+  }
+}
+.auth-coin {
+  position: absolute;
+  bottom: -40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #f3d9a4, #d8a64f);
+  color: #7a5517;
+  font-weight: 700;
+  box-shadow: inset 0 -2px 4px rgba(122, 85, 23, 0.35), 0 4px 10px rgba(122, 85, 23, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  animation: coinFloat 12s linear infinite;
+}
+@keyframes coinFloat {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.75;
+  }
+  85% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateY(-105vh) rotate(300deg);
+    opacity: 0;
+  }
+}
+.auth-card {
+  animation: cardRise calc(520ms * var(--site-motion, 1)) cubic-bezier(0.22, 1, 0.36, 1) both;
+  box-shadow: 0 2px 4px rgba(31, 36, 33, 0.04), 0 30px 60px -30px rgba(31, 36, 33, 0.35);
+}
+@keyframes cardRise {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.auth-tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line);
+  background: #f4f1ea;
+  border-radius: 12px;
+  padding: 3px;
+}
+.auth-tab-indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(31, 36, 33, 0.12);
+  transition: transform calc(240ms * var(--site-motion, 1)) cubic-bezier(0.22, 1, 0.36, 1);
+}
+.auth-tab-indicator-right {
+  transform: translateX(100%);
+}
+.auth-tab {
+  position: relative;
+  z-index: 1;
+  padding: 8px 0;
+  border: none;
+  background: transparent;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+.auth-tab-active {
+  color: #0b6357;
+}
+
+.shake {
+  animation: shakeX calc(360ms * var(--site-motion, 1)) ease;
+}
+@keyframes shakeX {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+
+/* ---- 主应用页面切换与微交互 ---- */
+.page-enter {
+  animation: pageEnter calc(320ms * var(--site-motion, 1)) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.card {
+  transition: transform calc(180ms * var(--site-motion, 1)) ease, box-shadow calc(180ms * var(--site-motion, 1)) ease;
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(31, 36, 33, 0.04), 0 18px 40px -26px rgba(31, 36, 33, 0.5);
+}
+.typing-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: #0e7568;
+  animation: caretBlink 0.9s steps(1) infinite;
+}
+@keyframes caretBlink {
+  50% {
+    opacity: 0;
+  }
+}

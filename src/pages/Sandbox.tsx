@@ -182,16 +182,16 @@ export function SandboxPage() {
     <div className="fade-in" data-testid="sandbox">
       <PageHeader
         title="消费决策沙盘"
-        description="同一个预测引擎，分别模拟立即购买、延期购买和分阶段预留后购买。模拟不会写入真实账本。"
+        description="想买大件？先在这里试算：对比立即购买、延期购买、分阶段预留后购买对现金流的影响，再决定怎么买。模拟不会写入真实账本。"
         actions={<Badge tone="teal"><FlaskConical size={11} /> 只读模拟</Badge>}
       />
 
       <div className="grid gap-4 xl:grid-cols-[1fr_1.65fr]">
         <Card title="购买方案" subtitle="价格、日期与预留节奏">
           <div className="space-y-3.5">
-            <Field label="名称"><input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={20} /></Field>
+            <Field label="名称"><input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={20} placeholder="例如：新电脑" /></Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="价格（元）"><input className="input num" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
+              <Field label="价格（元）"><input className="input num" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="5000.00" /></Field>
               <Field label="计划购买日"><input className="input" type="date" min={today} value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} /></Field>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -201,7 +201,7 @@ export function SandboxPage() {
                   <option value="week">每周</option>
                 </select>
               </Field>
-              <Field label="每隔几次"><input className="input num" inputMode="numeric" value={reserveInterval} onChange={(e) => setReserveInterval(e.target.value)} /></Field>
+              <Field label="每隔几次"><input className="input num" inputMode="numeric" value={reserveInterval} onChange={(e) => setReserveInterval(e.target.value)} placeholder="1" /></Field>
             </div>
             <Field label="关联目标（可选）" hint={goalId ? `该目标已预留 ¥${(goalReserved / 100).toFixed(2)}，会作为起始预留计入分阶段方案。` : '关联后，已有预留可直接用于本次购买。'}>
               <select className="select" value={goalId} onChange={(e) => setGoalId(e.target.value)}>
