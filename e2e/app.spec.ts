@@ -9,9 +9,14 @@ async function loadDemo(target: Page, username = 'e2e演示员') {
   await target.goto('/');
   await expect(target.getByTestId('auth-page')).toBeVisible();
   await target.getByTestId('auth-tab-register').click();
+  await expect(target.getByTestId('auth-confirm')).toBeVisible();
   await target.getByTestId('auth-username').fill(username);
   await target.getByTestId('auth-password').fill('e2e-pass-123');
   await target.getByTestId('auth-confirm').fill('e2e-pass-123');
+  await target.getByTestId('auth-submit').click();
+  await expect(target.getByTestId('auth-registered-note')).toBeVisible();
+  await expect(target.getByTestId('auth-username')).toHaveValue(username);
+  await target.getByTestId('auth-password').fill('e2e-pass-123');
   await target.getByTestId('auth-submit').click();
   await expect(target.getByTestId('load-demo')).toBeVisible({ timeout: 60_000 });
   await target.getByTestId('load-demo').click();

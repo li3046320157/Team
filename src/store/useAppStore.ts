@@ -120,13 +120,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   register: async (username, password) => {
     try {
-      const user = await registerUser(username, password);
-      setPersonalDbName(personalDbNameFor(user.id));
-      const migrated = await adoptLegacyPersonalData();
-      storeSession(user.id);
-      set({ user, error: null });
-      await get().init();
-      get().notify(migrated ? '注册成功，已迁入本机原有账本数据' : '注册成功，欢迎使用 MoneyFlow', 'success');
+      await registerUser(username, password);
       return null;
     } catch (error) {
       return error instanceof Error ? error.message : '注册失败，请重试';
@@ -137,10 +131,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const user = await loginUser(username, password);
       setPersonalDbName(personalDbNameFor(user.id));
+      const migrated = await adoptLegacyPersonalData();
       storeSession(user.id);
       set({ user, error: null });
       await get().init();
-      get().notify(`欢迎回来，${user.username}`, 'success');
+      get().notify(migrated ? `欢迎回来，${user.username}；已迁入本机原有账本数据` : `欢迎回来，${user.username}`, 'success');
       return null;
     } catch (error) {
       return error instanceof Error ? error.message : '登录失败，请重试';

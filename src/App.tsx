@@ -44,10 +44,13 @@ export function App() {
 
   if (!user) {
     return (
-      <>
-        <AuthPage />
+      <HashRouter>
+        <Routes>
+          <Route path="/register" element={<AuthPage mode="register" />} />
+          <Route path="*" element={<AuthPage mode="login" />} />
+        </Routes>
         <Toast />
-      </>
+      </HashRouter>
     );
   }
 
