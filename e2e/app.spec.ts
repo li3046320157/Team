@@ -5,9 +5,15 @@ test.describe.configure({ mode: 'serial' });
 let context: BrowserContext;
 let page: Page;
 
-async function loadDemo(target: Page) {
+async function loadDemo(target: Page, username = 'e2e演示员') {
   await target.goto('/');
-  await expect(target.getByTestId('load-demo')).toBeVisible();
+  await expect(target.getByTestId('auth-page')).toBeVisible();
+  await target.getByTestId('auth-tab-register').click();
+  await target.getByTestId('auth-username').fill(username);
+  await target.getByTestId('auth-password').fill('e2e-pass-123');
+  await target.getByTestId('auth-confirm').fill('e2e-pass-123');
+  await target.getByTestId('auth-submit').click();
+  await expect(target.getByTestId('load-demo')).toBeVisible({ timeout: 60_000 });
   await target.getByTestId('load-demo').click();
   await expect(target.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
 }
@@ -135,6 +141,35 @@ test('设置：保存参数后显示已保存标记', async () => {
   await expect(page.getByText('已保存', { exact: false }).first()).toBeVisible();
 });
 
+test('AI 分析：配置校验、保存与连接失败提示', async () => {
+  await page.goto('/#/assistant');
+  await expect(page.getByTestId('assistant')).toBeVisible();
+  await page.getByTestId('ai-save').click();
+  await expect(page.getByRole('alert')).toContainText('地址');
+  await page.getByTestId('ai-base').fill('https://api.example.com/v1');
+  await page.getByTestId('ai-key').fill('sk-e2e-fake-key-000000');
+  await page.getByTestId('ai-model').fill('e2e-model');
+  await page.getByTestId('ai-save').click();
+  await expect(page.getByRole('status')).toContainText('AI 接口配置已保存到本机');
+  await page.getByTestId('chat-input').fill('你好，请分析我的账本');
+  await page.getByTestId('chat-send').click();
+  await expect(page.getByTestId('chat-error')).toBeVisible({ timeout: 30_000 });
+});
+
+test('登录注册：错误密码提示、退出与重新登录', async () => {
+  await page.getByTestId('logout').click();
+  await expect(page.getByTestId('auth-page')).toBeVisible();
+  await page.getByTestId('auth-username').fill('e2e演示员');
+  await page.getByTestId('auth-password').fill('wrong-password');
+  await page.getByTestId('auth-submit').click();
+  await expect(page.getByTestId('auth-error')).toContainText('用户名或密码不正确');
+  await page.getByTestId('auth-password').fill('e2e-pass-123');
+  await page.getByTestId('auth-submit').click();
+  await expect(page.getByTestId('user-chip')).toContainText('e2e演示员', { timeout: 60_000 });
+  await page.goto('/#/');
+  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
+});
+
 test('移动端：底部导航与「更多」抽屉可进入计划页', async ({ browser }) => {
   const mobile = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -143,7 +178,7 @@ test('移动端：底部导航与「更多」抽屉可进入计划页', async ({
     locale: 'zh-CN',
   });
   const mp = await mobile.newPage();
-  await loadDemo(mp);
+  await loadDemo(mp, 'e2e移动端');
   await expect(mp.getByRole('navigation', { name: '底部导航' })).toBeVisible();
   await mp.getByRole('button', { name: '更多', exact: true }).click();
   await expect(mp.getByText(/更多功能/)).toBeVisible();

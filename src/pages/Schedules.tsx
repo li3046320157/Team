@@ -158,12 +158,12 @@ function FlowForm({
             </select>
           </Field>
           <Field label="每隔几次" hint="月/年重复会按原始日号自动处理月底，如 31 日在 2 月截断。">
-            <input className="input num" inputMode="numeric" value={interval} onChange={(e) => setIntervalCount(e.target.value)} />
+            <input className="input num" inputMode="numeric" value={interval} onChange={(e) => setIntervalCount(e.target.value)} placeholder="1" />
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="商户 / 对方（可选）"><input className="input" value={merchant} onChange={(e) => setMerchant(e.target.value)} /></Field>
-          <Field label="备注（可选）"><input className="input" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+          <Field label="商户 / 对方（可选）"><input className="input" value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder="例如：房东 / 视频平台" /></Field>
+          <Field label="备注（可选）"><input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="例如：每月固定支出" /></Field>
         </div>
         {flow && nextPendingDate && (
           <Field label="修改范围">
@@ -221,7 +221,7 @@ export function SchedulesPage() {
     <div className="fade-in" data-testid="schedules">
       <PageHeader
         title="计划"
-        description="固定收支按规则推导；只有核销才写入真实流水。逾期支出会在预测中按今日待付保守计入。"
+        description="管理工资、房租、订阅这类固定收支：到期提醒、一键核销。固定收支按规则推导；只有核销才写入真实流水。逾期支出会在预测中按今日待付保守计入。"
         actions={<Button variant="primary" onClick={() => { setEditingFlow(undefined); setFormOpen(true); }}><Plus size={15} /> 新建计划</Button>}
       />
 
@@ -439,7 +439,7 @@ function SettleModal({ view, dataset, onClose }: { view: OccurrenceView | null; 
             <span className="ml-2 text-[#6B6A63]">原到期 {formatCN(view.dueDate)}</span>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="实际金额（元）"><input className="input num" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
+            <Field label="实际金额（元）"><input className="input num" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" /></Field>
             <Field label="记账日期"><input className="input" type="date" max={today} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
           </div>
           <div className="grid grid-cols-2 gap-3">

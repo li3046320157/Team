@@ -63,13 +63,41 @@ class MoneyFlowDB extends Dexie {
   }
 }
 
+const LEGACY_PERSONAL_DB = 'moneyflow-personal';
+let personalDbName = LEGACY_PERSONAL_DB;
 const dbs: Record<DataMode, MoneyFlowDB | null> = { personal: null, demo: null };
+
+/** 登录后把个人库指向该用户专属数据库；切换时关闭旧连接。 */
+export function setPersonalDbName(name: string): void {
+  if (name === personalDbName) return;
+  dbs.personal?.close();
+  dbs.personal = null;
+  personalDbName = name;
+}
 
 function dbFor(mode: DataMode): MoneyFlowDB {
   if (!dbs[mode]) {
-    dbs[mode] = new MoneyFlowDB(mode === 'personal' ? 'moneyflow-personal' : 'moneyflow-demo');
+    dbs[mode] = new MoneyFlowDB(mode === 'personal' ? personalDbName : 'moneyflow-demo');
   }
   return dbs[mode] as MoneyFlowDB;
+}
+
+/** 首个账户注册时，把旧版共享个人库的数据迁入当前用户库（迁移后清空旧库，避免重复认领）。 */
+export async function adoptLegacyPersonalData(): Promise<boolean> {
+  if (personalDbName === LEGACY_PERSONAL_DB) return false;
+  const target = dbFor('personal');
+  if (await target.meta.get(1)) return false;
+  const legacy = new MoneyFlowDB(LEGACY_PERSONAL_DB);
+  try {
+    if (!(await legacy.meta.get(1))) return false;
+    const dataset = await readFromDb(legacy);
+    if (!dataset) return false;
+    await writeToDb(target, dataset);
+    await legacy.delete();
+    return true;
+  } finally {
+    legacy.close();
+  }
 }
 
 export const MODE_STORAGE_KEY = 'moneyflow.mode';
@@ -91,8 +119,7 @@ export function storeMode(mode: DataMode): void {
   }
 }
 
-export async function readDataset(mode: DataMode): Promise<Dataset | null> {
-  const db = dbFor(mode);
+async function readFromDb(db: MoneyFlowDB): Promise<Dataset | null> {
   const meta = await db.meta.get(1);
   if (!meta) return null;
   const [settings, accounts, categories, transactions, flows, occurrenceRecords, candidates, reviews, goals, goalEvents, plans, snapshots, calibrations] =
@@ -132,9 +159,12 @@ export async function readDataset(mode: DataMode): Promise<Dataset | null> {
   };
 }
 
+export async function readDataset(mode: DataMode): Promise<Dataset | null> {
+  return readFromDb(dbFor(mode));
+}
+
 /** 整库覆盖写入：所有表处于同一事务，失败则整体回滚。 */
-export async function writeDataset(mode: DataMode, dataset: Dataset): Promise<void> {
-  const db = dbFor(mode);
+async function writeToDb(db: MoneyFlowDB, dataset: Dataset): Promise<void> {
   const metaRow: MetaRow = { ...dataset.meta, key: 1 };
   const settingsRow: SettingsRow = { ...dataset.settings, key: 1 };
   await db.transaction(
@@ -175,6 +205,10 @@ export async function writeDataset(mode: DataMode, dataset: Dataset): Promise<vo
       ]);
     },
   );
+}
+
+export async function writeDataset(mode: DataMode, dataset: Dataset): Promise<void> {
+  await writeToDb(dbFor(mode), dataset);
 }
 
 export async function clearDataset(mode: DataMode): Promise<void> {

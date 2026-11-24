@@ -142,7 +142,7 @@ export function LedgerPage() {
     <div className="fade-in" data-testid="ledger">
       <PageHeader
         title="流水"
-        description="本地记录每一笔真实收支。金额以整数分计算，转账不计入收支。"
+        description="记录每天真实发生的收入、支出和转账，可按分类与账户筛选回看。金额以整数分计算，转账不计入收支。"
         actions={
           <Button variant="primary" onClick={() => { setEditing(null); setFormOpen(true); }}>
             <Plus size={15} /> 记一笔

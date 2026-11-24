@@ -1,6 +1,7 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { useEffect } from 'react';
 import { AppShell } from './components/AppShell';
+import { AuthPage } from './components/AuthPage';
 import { Onboarding } from './components/Onboarding';
 import { Button, Spinner, Toast } from './components/ui';
 import { useAppStore } from './store/useAppStore';
@@ -13,8 +14,12 @@ import { SandboxPage } from './pages/Sandbox';
 import { GoalsPage } from './pages/Goals';
 import { DataCenterPage } from './pages/DataCenter';
 import { SettingsPage } from './pages/Settings';
+import { AssistantPage } from './pages/Assistant';
 
 export function App() {
+  const boot = useAppStore((s) => s.boot);
+  const authReady = useAppStore((s) => s.authReady);
+  const user = useAppStore((s) => s.user);
   const init = useAppStore((s) => s.init);
   const ready = useAppStore((s) => s.ready);
   const loading = useAppStore((s) => s.loading);
@@ -23,8 +28,28 @@ export function App() {
   const dismissError = useAppStore((s) => s.dismissError);
 
   useEffect(() => {
-    void init();
-  }, [init]);
+    void boot();
+  }, [boot]);
+
+  if (!authReady) {
+    return (
+      <div className="grid min-h-screen place-items-center">
+        <div className="card flex w-[280px] flex-col items-center gap-3 p-8">
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#0E7568] text-xl font-bold text-white">¥</div>
+          <Spinner label="正在打开本地账本…" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <AuthPage />
+        <Toast />
+      </>
+    );
+  }
 
   if (!ready || (loading && !dataset)) {
     return (
@@ -75,6 +100,7 @@ export function App() {
           <Route path="/schedules" element={<SchedulesPage />} />
           <Route path="/insights" element={<InsightsPage />} />
           <Route path="/forecast" element={<ForecastPage />} />
+          <Route path="/assistant" element={<AssistantPage />} />
           <Route path="/sandbox" element={<SandboxPage />} />
           <Route path="/goals" element={<GoalsPage />} />
           <Route path="/data" element={<DataCenterPage />} />

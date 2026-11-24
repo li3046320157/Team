@@ -137,7 +137,7 @@ export function DataCenterPage() {
     <div className="fade-in" data-testid="data-center">
       <PageHeader
         title="数据中心"
-        description="备份、恢复、CSV 导出、预测快照与校准。所有数据只保存在当前浏览器的 IndexedDB 中，不上传服务器。"
+        description="备份与恢复你的账本、导出 CSV、回看预测快照与校准记录。换电脑或清理浏览器前请先导出备份。所有数据只保存在当前浏览器的 IndexedDB 中，不上传服务器。"
         actions={(
           <>
             <Button variant="secondary" onClick={exportBackup} data-testid="export-backup"><Download size={14} /> 备份 JSON</Button>

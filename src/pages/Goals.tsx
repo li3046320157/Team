@@ -206,7 +206,7 @@ export function GoalsPage() {
     <div className="fade-in" data-testid="goals">
       <PageHeader
         title="储蓄目标"
-        description="预留不是扣款：它只降低可支配金额，钱仍在你的账户里；从预留中消费才真正记账。"
+        description="为旅行、大件购物等设定存钱目标：系统按你的现金流推算每月该存多少、何时能达成。预留不是扣款：它只降低可支配金额，钱仍在你的账户里；从预留中消费才真正记账。"
         actions={<Button variant="primary" onClick={openCreate} data-testid="add-goal"><Plus size={14} /> 新建目标</Button>}
       />
 
@@ -450,7 +450,7 @@ export function GoalsPage() {
         )}
       >
         <div className="space-y-3.5">
-          <Field label="金额（元）"><input className="input num" inputMode="decimal" value={amountText} onChange={(e) => setAmountText(e.target.value)} /></Field>
+          <Field label="金额（元）"><input className="input num" inputMode="decimal" value={amountText} onChange={(e) => setAmountText(e.target.value)} placeholder="0.00" /></Field>
           {action?.mode === 'consume' && (
             <div className="grid grid-cols-2 gap-3">
               <Field label="账户">
@@ -466,7 +466,7 @@ export function GoalsPage() {
               </Field>
             </div>
           )}
-          <Field label="备注（可选）"><input className="input" value={actionNote} onChange={(e) => setActionNote(e.target.value)} maxLength={40} /></Field>
+          <Field label="备注（可选）"><input className="input" value={actionNote} onChange={(e) => setActionNote(e.target.value)} maxLength={40} placeholder="例如：工资到账后预留" /></Field>
           {action?.mode === 'consume' && (
             <InfoNote>支出会写入真实账本（收入支出 → 支出），同时等额消耗预留；可支配金额不会因此再下降。</InfoNote>
           )}
