@@ -129,3 +129,8 @@ export function clearSession(): void {
 export function personalDbNameFor(userId: string): string {
   return `moneyflow-user-${userId}`;
 }
+
+export function closeAuthDb(): void {
+  authDb?.close();
+  authDb = null;
+}

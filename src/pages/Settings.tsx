@@ -4,6 +4,7 @@ import { useAppStore } from '../store/useAppStore';
 import { addDaysISO, formatCN, todayISO } from '../domain/days';
 import { formatMoney, parseMoneyInput } from '../domain/money';
 import { validateCoverage } from '../domain/ledger';
+import { wipeAllLocalData } from '../data/wipe';
 import type { AccountType, CoverageInterval } from '../domain/types';
 import { Badge, Button, Card, Field, InfoNote, Modal, Money, PageHeader, cn } from '../components/ui';
 
@@ -49,6 +50,8 @@ export function SettingsPage() {
   const [accBalance, setAccBalance] = useState('');
   const [accDate, setAccDate] = useState(addDaysISO(today, -30));
   const [accError, setAccError] = useState<string | null>(null);
+  const [wipeOpen, setWipeOpen] = useState(false);
+  const [wiping, setWiping] = useState(false);
 
   const save = async () => {
     setError(null);
@@ -128,6 +131,18 @@ export function SettingsPage() {
   };
 
   const coveredDays = coverage.reduce((sum, c) => sum + Math.max(0, intervalDays(c)), 0);
+
+  const wipeLocal = async () => {
+    setWiping(true);
+    try {
+      await wipeAllLocalData();
+      window.location.reload();
+    } catch {
+      setWiping(false);
+      setError('清除失败，请检查浏览器存储权限');
+      setWipeOpen(false);
+    }
+  };
 
   return (
     <div className="fade-in" data-testid="settings">
@@ -238,13 +253,22 @@ export function SettingsPage() {
           </p>
         </Card>
 
+        <Card title="本机数据" subtitle="账户、账本与 AI 配置都只存在于当前浏览器" action={<Trash2 size={15} className="text-[#98362E]" />}>
+          <p className="text-[11.5px] leading-relaxed text-[#6B6A63]">
+            清除后会删除本机所有账户、账本、目标与 AI 接口配置，并回到登录页；此操作无法撤销，请先到数据中心导出备份。
+          </p>
+          <Button variant="danger" size="sm" className="mt-3" onClick={() => setWipeOpen(true)} data-testid="wipe-local-data">
+            <Trash2 size={13} /> 清除本机全部数据
+          </Button>
+        </Card>
+
         <Card title="关于与数据原则" subtitle="MoneyFlow 钱流 · 本地优先的个人现金流工作台" action={<Settings2 size={15} className="text-[#8A887F]" />}>
           <ul className="space-y-2 text-[11.5px] leading-relaxed text-[#6B6A63]">
             <li>版本 1.0.0 · 数据格式 v1 · 设置版本 v{s.settingsVersion}</li>
             <li>所有数据存于浏览器 IndexedDB，不上传；备份文件由你自行保管。</li>
             <li>金额一律整数分；日期一律本地 YYYY-MM-DD，避免时区漂移。</li>
             <li>预测快照不可修改，用于事后校准与滚动回测；校准只影响未来预测。</li>
-            <li>示例数据为合成数据，按当天重新生成，不含真实个人信息。</li>
+            <li>退出登录不会删除本机数据；彻底重置请使用下方「清除本机全部数据」。</li>
           </ul>
           <div className="mt-3 flex flex-wrap gap-1.5">
             <Badge tone="teal">React 19</Badge>
@@ -290,6 +314,25 @@ export function SettingsPage() {
           <p className={cn('text-[10.5px] text-[#8A887F]')}>新增账户后可直接在记账页选择它；期初余额会立即计入总余额。</p>
           {accError && <p className="rounded-lg bg-[#FCF1EF] px-3 py-2 text-[12px] text-[#98362E]">{accError}</p>}
         </div>
+      </Modal>
+
+      <Modal
+        open={wipeOpen}
+        title="清除本机全部数据？"
+        subtitle="所有账户、账本、目标与 AI 配置都会被永久删除。"
+        onClose={() => setWipeOpen(false)}
+        footer={(
+          <>
+            <Button variant="secondary" onClick={() => setWipeOpen(false)} disabled={wiping}>取消</Button>
+            <Button variant="danger" onClick={() => void wipeLocal()} disabled={wiping} data-testid="confirm-wipe-local-data">
+              {wiping ? '正在清除…' : '确认清除'}
+            </Button>
+          </>
+        )}
+      >
+        <p className="text-[12px] leading-relaxed text-[#6B6A63]">
+          清除后会回到登录页，需要重新注册账户。如果还需要这些数据，请先取消并到「数据中心」导出 JSON 备份。
+        </p>
       </Modal>
     </div>
   );

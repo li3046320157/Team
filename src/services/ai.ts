@@ -64,12 +64,42 @@ export function validateAiConfig(config: AiConfig): string | null {
   return null;
 }
 
+/** 候选地址：优先用户填写的根地址；未带 /v1 时再尝试 /v1 前缀，兼容常见中转。 */
+export function endpointCandidates(baseUrl: string, path: string): string[] {
+  const base = normalizeApiBase(baseUrl);
+  if (!base) return [];
+  const urls = [`${base}${path}`];
+  if (!/\/v\d+$/i.test(base)) urls.push(`${base}/v1${path}`);
+  return [...new Set(urls)];
+}
+
 export function chatEndpoint(config: AiConfig): string {
-  return `${normalizeApiBase(config.baseUrl)}/chat/completions`;
+  return endpointCandidates(config.baseUrl, '/chat/completions')[0] ?? '';
 }
 
 export function modelsEndpoint(config: AiConfig): string {
-  return `${normalizeApiBase(config.baseUrl)}/models`;
+  return endpointCandidates(config.baseUrl, '/models')[0] ?? '';
+}
+
+/** 用 no-cors 探测服务器是否可达：能到达但正常请求被拦，说明是 CORS 限制。 */
+async function probeReachable(baseUrl: string): Promise<boolean> {
+  const [url] = endpointCandidates(baseUrl, '/models');
+  if (!url) return false;
+  try {
+    await fetch(url, { mode: 'no-cors', cache: 'no-store' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function unreachableError(config: AiConfig): Promise<AiError> {
+  if (await probeReachable(config.baseUrl)) {
+    return new AiError(
+      '服务器可达，但拒绝了浏览器的跨域请求（CORS），网页端无法绕过。请更换支持跨域的官方 API 或中转地址；模型名称也可以手动填写后保存。',
+    );
+  }
+  return new AiError('无法连接 API 地址：请检查网络、地址拼写与跨域设置；也可以直接手动填写模型名称。');
 }
 
 /** 增量 SSE 解析器：跨 chunk 缓冲不完整行，返回内容增量与是否结束。 */
@@ -132,22 +162,33 @@ export async function streamChat(params: {
   onDelta: (delta: string) => void;
 }): Promise<string> {
   const { config, messages, signal, onDelta } = params;
-  let response: Response;
-  try {
-    response = await fetch(chatEndpoint(config), {
-      method: 'POST',
-      signal,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.apiKey.trim()}`,
-      },
-      body: JSON.stringify({ model: config.model.trim(), messages, stream: true, temperature: 0.6 }),
-    });
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') throw error;
-    throw new AiError('无法连接 API 地址：请检查网络、地址是否正确，以及该服务是否允许浏览器跨域（CORS）访问。');
+  const candidates = endpointCandidates(config.baseUrl, '/chat/completions');
+  let response: Response | null = null;
+  for (let i = 0; i < candidates.length; i += 1) {
+    try {
+      const attempt = await fetch(candidates[i], {
+        method: 'POST',
+        signal,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.apiKey.trim()}`,
+        },
+        body: JSON.stringify({ model: config.model.trim(), messages, stream: true, temperature: 0.6 }),
+      });
+      if (!attempt.ok) {
+        const error = friendlyHttpError(attempt.status, await readErrorBody(attempt));
+        if (attempt.status === 404 && i < candidates.length - 1) continue;
+        throw error;
+      }
+      response = attempt;
+      break;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') throw error;
+      if (error instanceof AiError) throw error;
+      /* 网络或跨域错误：继续尝试下一个候选地址 */
+    }
   }
-  if (!response.ok) throw friendlyHttpError(response.status, await readErrorBody(response));
+  if (!response) throw await unreachableError(config);
 
   const contentType = response.headers.get('Content-Type') ?? '';
   if (!contentType.includes('text/event-stream') || !response.body) {
@@ -176,19 +217,30 @@ export async function streamChat(params: {
 }
 
 export async function fetchModelList(config: AiConfig): Promise<string[]> {
-  let response: Response;
-  try {
-    response = await fetch(modelsEndpoint(config), {
-      headers: { Authorization: `Bearer ${config.apiKey.trim()}` },
-    });
-  } catch {
-    throw new AiError('无法连接 API 地址，请检查网络与跨域设置；也可以直接手动填写模型名称。');
+  const candidates = endpointCandidates(config.baseUrl, '/models');
+  let networkFailed = false;
+  for (let i = 0; i < candidates.length; i += 1) {
+    let response: Response;
+    try {
+      response = await fetch(candidates[i], {
+        headers: { Authorization: `Bearer ${config.apiKey.trim()}` },
+      });
+    } catch {
+      networkFailed = true;
+      continue;
+    }
+    if (!response.ok) {
+      const error = friendlyHttpError(response.status, await readErrorBody(response));
+      if (response.status === 404 && i < candidates.length - 1) continue;
+      throw error;
+    }
+    const payload = (await response.json()) as { data?: { id?: string }[] };
+    const ids = (payload.data ?? []).map((m) => m.id).filter((id): id is string => typeof id === 'string' && id.length > 0);
+    if (ids.length === 0) throw new AiError('该地址没有返回模型列表，请直接手动填写模型名称。');
+    return ids.sort();
   }
-  if (!response.ok) throw friendlyHttpError(response.status, await readErrorBody(response));
-  const payload = (await response.json()) as { data?: { id?: string }[] };
-  const ids = (payload.data ?? []).map((m) => m.id).filter((id): id is string => typeof id === 'string' && id.length > 0);
-  if (ids.length === 0) throw new AiError('该地址没有返回模型列表，请直接手动填写模型名称。');
-  return ids.sort();
+  if (networkFailed) throw await unreachableError(config);
+  throw new AiError('该地址没有返回模型列表，请直接手动填写模型名称。');
 }
 
 const yuan = (cents: number): string => formatMoney(cents);
