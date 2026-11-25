@@ -542,21 +542,12 @@ table.data tbody tr:hover {
   }
 }
 
-/* ---- 主应用页面切换与微交互 ---- */
-.page-enter {
-  animation: pageEnter calc(var(--dur-4) * var(--site-motion, 1)) var(--ease-enter) both;
-}
-@keyframes pageEnter {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.99);
-    filter: blur(2.5px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-    filter: blur(0);
-  }
+/* ---- 主应用页面过渡与滚动显现由 GSAP/ScrollTrigger 接管 ---- */
+.page-motion > .fade-in,
+.page-motion .rise,
+.page-motion .stat-in,
+.page-motion .chart-enter {
+  animation: none !important;
 }
 
 /* ---- 图表、列表与数字动效 ---- */
@@ -634,11 +625,17 @@ table.data tbody tr:hover {
   }
 }
 .card {
-  transition: transform calc(var(--dur-2) * var(--site-motion, 1)) var(--ease-standard), box-shadow calc(var(--dur-2) * var(--site-motion, 1)) var(--ease-standard);
+  transition:
+    transform calc(var(--dur-2) * var(--site-motion, 1)) var(--ease-standard),
+    box-shadow calc(var(--dur-2) * var(--site-motion, 1)) var(--ease-standard),
+    border-color calc(var(--dur-2) * var(--site-motion, 1)) var(--ease-standard);
 }
-.card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 2px 4px rgba(31, 36, 33, 0.04), 0 18px 40px -26px rgba(31, 36, 33, 0.5);
+@media (hover: hover) {
+  .card:hover {
+    transform: translateY(-2px);
+    border-color: #d8d3c7;
+    box-shadow: 0 2px 4px rgba(31, 36, 33, 0.04), 0 18px 40px -26px rgba(31, 36, 33, 0.5);
+  }
 }
 .typing-caret {
   display: inline-block;
@@ -942,9 +939,53 @@ table.data tbody tr:hover {
   overflow: hidden;
 }
 
+/* ---- 滚动进度、导航与焦点反馈 ---- */
+.scroll-progress {
+  position: fixed;
+  inset: 0 0 auto;
+  height: 2px;
+  z-index: 40;
+  pointer-events: none;
+}
+.scroll-progress > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--teal), #3aa08f 55%, var(--amber));
+  opacity: 0.85;
+}
+.app-header {
+  transition: box-shadow calc(var(--dur-2) * var(--site-motion, 1)) var(--ease-standard);
+}
+.app-header.is-scrolled {
+  box-shadow: 0 12px 26px -24px rgba(31, 36, 33, 0.6);
+}
+.nav-link svg {
+  transition: transform calc(var(--dur-2) * var(--site-motion, 1)) var(--ease-standard);
+}
+.nav-link:hover svg {
+  transform: translateX(1px) scale(1.06);
+}
+.nav-link.active::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  width: 3px;
+  height: 14px;
+  margin-top: -7px;
+  border-radius: 999px;
+  background: var(--site-accent);
+}
+:where(a, button, [role='switch']):focus-visible {
+  outline: 2px solid rgba(14, 117, 104, 0.55);
+  outline-offset: 2px;
+}
+
 /* 系统开启「减弱动态效果」时：入场动画改为纯淡入、装饰循环放慢，避免 0.01ms 无限循环造成闪烁 */
 @media (prefers-reduced-motion: reduce) {
-  .page-enter,
   .fade-in,
   .auth-card,
   .chart-enter,
@@ -995,6 +1036,18 @@ table.data tbody tr:hover {
   .typing-caret {
     animation: none;
     opacity: 1;
+  }
+  .scroll-progress {
+    display: none;
+  }
+  .card:hover {
+    transform: none;
+  }
+  .app-header {
+    transition: none;
+  }
+  .nav-link svg {
+    transition: none;
   }
 }
 @keyframes softFade {
