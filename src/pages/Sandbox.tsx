@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import type { EChartsOption } from 'echarts';
 import { FlaskConical, Play, Save, Trash2, TriangleAlert } from 'lucide-react';
 import type { PurchasePlan } from '../domain/types';
@@ -9,7 +9,7 @@ import { reservedByGoal } from '../domain/ledger';
 import { runSandbox, riskLevelFor, type SandboxResult, type ScenarioOutcome } from '../domain/sandbox';
 import { savePlan, deletePlan, type PlanInput } from '../services/mutations';
 import { EChart } from '../components/Chart';
-import { Badge, Button, Card, EmptyState, Field, InfoNote, Money, PageHeader, cn } from '../components/ui';
+import { Badge, Button, Card, EmptyState, Field, InfoNote, Money, PageHeader, Switch, cn } from '../components/ui';
 import { amountInputValue, riskText } from '../lib/ui';
 
 const SCENARIO_COLOR: Record<string, string> = {
@@ -19,10 +19,10 @@ const SCENARIO_COLOR: Record<string, string> = {
   staged: '#0E7568',
 };
 
-function ScenarioCard({ outcome, price, baseline }: { outcome: ScenarioOutcome; price: number; baseline: ScenarioOutcome }) {
+function ScenarioCard({ outcome, price, baseline, className, style }: { outcome: ScenarioOutcome; price: number; baseline: ScenarioOutcome; className?: string; style?: CSSProperties }) {
   const level = riskLevelFor(outcome.risk, baseline.forecast.summary.safetyReserve);
   return (
-    <div className={cn('rounded-xl border p-3', outcome.type === 'staged' ? 'border-[#BFE0D7] bg-[#F7FCFA]' : 'border-[#EFECE6] bg-white')} data-testid={`scenario-${outcome.type}`}>
+    <div className={cn('rounded-xl border p-3', outcome.type === 'staged' ? 'border-[#BFE0D7] bg-[#F7FCFA]' : 'border-[#EFECE6] bg-white', className)} style={style} data-testid={`scenario-${outcome.type}`}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-[13px] font-semibold">{outcome.title}</p>
         <Badge tone={level === 'danger' ? 'danger' : level === 'warning' ? 'amber' : 'teal'}>{riskText(level)}</Badge>
@@ -59,6 +59,7 @@ export function SandboxPage() {
   const [result, setResult] = useState<SandboxResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState('');
+  const [formStamp, setFormStamp] = useState(0);
 
   const goalReserved = goalId ? (reservedByGoal(dataset.goalEvents, today).get(goalId) ?? 0) : 0;
   const activeGoals = dataset.goals.filter((g) => g.status === 'active');
@@ -116,6 +117,7 @@ export function SandboxPage() {
     setReserveInterval(String(plan.reserveInterval));
     setResult(null);
     setError(null);
+    setFormStamp((s) => s + 1);
   };
 
   const chartOption = useMemo<EChartsOption>(() => {
@@ -127,7 +129,6 @@ export function SandboxPage() {
       return dates.map((d) => map.get(d) ?? null);
     };
     return {
-      animationDuration: 450,
       legend: { top: 0, textStyle: { fontSize: 10, color: '#6B6A63' }, itemWidth: 14, itemHeight: 3 },
       grid: { left: 50, right: 16, top: 30, bottom: 28 },
       tooltip: {
@@ -187,7 +188,7 @@ export function SandboxPage() {
       />
 
       <div className="grid gap-4 xl:grid-cols-[1fr_1.65fr]">
-        <Card title="购买方案" subtitle="价格、日期与预留节奏">
+        <Card key={formStamp} className="rise balance-pulse" title="购买方案" subtitle="价格、日期与预留节奏">
           <div className="space-y-3.5">
             <Field label="名称"><input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={20} placeholder="例如：新电脑" /></Field>
             <div className="grid grid-cols-2 gap-3">
@@ -210,7 +211,7 @@ export function SandboxPage() {
               </select>
             </Field>
             <label className="flex items-center gap-2 text-[12px] text-[#6B6A63]">
-              <input type="checkbox" checked={allowDelay} onChange={(e) => setAllowDelay(e.target.checked)} />
+              <Switch checked={allowDelay} onChange={setAllowDelay} aria-label="允许延期购买" />
               允许延期购买（搜索 90 天内最早安全日）
             </label>
             {error && <p className="rounded-lg bg-[#FCF1EF] px-3 py-2 text-[12px] text-[#98362E]">{error}</p>}
@@ -236,10 +237,10 @@ export function SandboxPage() {
           ) : (
             <>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <ScenarioCard outcome={result.baseline} price={result.baseline.risk.minBalance} baseline={result.baseline} />
-                <ScenarioCard outcome={result.immediate} price={result.immediate.risk.minBalance} baseline={result.baseline} />
-                <ScenarioCard outcome={result.delayed} price={result.delayed.risk.minBalance} baseline={result.baseline} />
-                <ScenarioCard outcome={result.staged} price={result.staged.risk.minBalance} baseline={result.baseline} />
+                <ScenarioCard className="rise" style={{ '--i': 0 } as CSSProperties} outcome={result.baseline} price={result.baseline.risk.minBalance} baseline={result.baseline} />
+                <ScenarioCard className="rise" style={{ '--i': 1 } as CSSProperties} outcome={result.immediate} price={result.immediate.risk.minBalance} baseline={result.baseline} />
+                <ScenarioCard className="rise" style={{ '--i': 2 } as CSSProperties} outcome={result.delayed} price={result.delayed.risk.minBalance} baseline={result.baseline} />
+                <ScenarioCard className="rise" style={{ '--i': 3 } as CSSProperties} outcome={result.staged} price={result.staged.risk.minBalance} baseline={result.baseline} />
               </div>
 
               <Card
@@ -255,7 +256,7 @@ export function SandboxPage() {
                 <p className="mt-1 text-[10.5px] text-[#8A887F]">图表固定使用最近一次运行参数；修改左侧后请重新运行以更新。</p>
               </Card>
 
-              <Card title="结论与限制" subtitle="沙盘不是推荐购买，只是把不同选择的现金流后果摊开">
+              <Card className="rise" title="结论与限制" subtitle="沙盘不是推荐购买，只是把不同选择的现金流后果摊开">
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="rounded-lg bg-[#FAF8F3] px-3 py-2.5">
                     <p className="text-[10.5px] font-semibold text-[#8A887F]">立即购买</p>
@@ -289,8 +290,8 @@ export function SandboxPage() {
               <p className="text-[12px] text-[#8A887F]">还没有保存的计划。</p>
             ) : (
               <ul className="space-y-2">
-                {dataset.plans.map((plan) => (
-                  <li key={plan.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#EFECE6] px-3 py-2.5">
+                {dataset.plans.map((plan, i) => (
+                  <li key={plan.id} className="rise flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#EFECE6] px-3 py-2.5" style={{ '--d': `${Math.min(i, 7) * 24}ms` } as CSSProperties}>
                     <div>
                       <p className="text-[12.5px] font-medium">{plan.name}</p>
                       <p className="text-[10.5px] text-[#8A887F]">

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import type { EChartsOption } from 'echarts';
 import { Archive, ArchiveRestore, CalendarClock, Pencil, PiggyBank, Plus, ShoppingBag, Target, Undo2 } from 'lucide-react';
 import type { FinancialGoal } from '../domain/types';
@@ -19,7 +19,7 @@ import {
   type GoalInput,
 } from '../services/mutations';
 import { EChart } from '../components/Chart';
-import { Badge, Button, Card, EmptyState, Field, InfoNote, Modal, Money, PageHeader, Progress, Segmented, cn } from '../components/ui';
+import { Badge, Button, Card, EmptyState, Field, InfoNote, Modal, Money, PageHeader, Progress, Segmented, StatCard, cn } from '../components/ui';
 
 type ActionMode = 'reserve' | 'release' | 'consume' | null;
 
@@ -114,7 +114,6 @@ export function GoalsPage() {
       };
     });
     return {
-      animationDuration: 400,
       legend: { top: 0, textStyle: { fontSize: 10, color: '#6B6A63' }, itemWidth: 14, itemHeight: 3 },
       grid: { left: 52, right: 16, top: 32, bottom: 30 },
       tooltip: {
@@ -211,23 +210,10 @@ export function GoalsPage() {
       />
 
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="card px-4 py-3">
-          <p className="text-[10.5px] font-semibold tracking-wide text-[#8A887F]">进行中目标</p>
-          <p className="num mt-1 text-[20px] font-semibold">{activeGoals.length}</p>
-        </div>
-        <div className="card px-4 py-3">
-          <p className="text-[10.5px] font-semibold tracking-wide text-[#8A887F]">目标总额</p>
-          <p className="num mt-1 text-[20px] font-semibold"><Money cents={totalTarget} /></p>
-        </div>
-        <div className="card px-4 py-3">
-          <p className="text-[10.5px] font-semibold tracking-wide text-[#8A887F]">已预留</p>
-          <p className="num mt-1 text-[20px] font-semibold text-[#0B6357]"><Money cents={totalReserved} /></p>
-        </div>
-        <div className="card px-4 py-3">
-          <p className="text-[10.5px] font-semibold tracking-wide text-[#8A887F]">当前最多可再预留</p>
-          <p className="num mt-1 text-[20px] font-semibold"><Money cents={maxReserve} /></p>
-          <p className="text-[10px] text-[#8A887F]">余额 − 总预留 − 安全储备</p>
-        </div>
+        <StatCard label="进行中目标" value={activeGoals.length} />
+        <StatCard label="目标总额" value={<Money cents={totalTarget} />} />
+        <StatCard label="已预留" value={<Money cents={totalReserved} />} tone="teal" />
+        <StatCard label="当前最多可再预留" value={<Money cents={maxReserve} />} hint="余额 − 总预留 − 安全储备" />
       </div>
 
       {dataset.goals.length === 0 ? (
@@ -241,14 +227,18 @@ export function GoalsPage() {
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
           <div className="space-y-3">
-            {dataset.goals.map((goal) => {
+            {dataset.goals.map((goal, i) => {
               const reserved = reservedMap.get(goal.id) ?? 0;
               const remaining = Math.max(0, goal.targetAmount - reserved);
               const left = daysLeft(goal.deadline, today);
               const pct = goal.targetAmount > 0 ? Math.round((reserved / goal.targetAmount) * 100) : 0;
               const archived = goal.status === 'archived';
               return (
-                <Card key={goal.id} className={cn(archived && 'opacity-70')}>
+                <Card
+                  key={goal.id}
+                  className={cn(!archived && 'rise', archived && 'opacity-55')}
+                  style={{ '--i': Math.min(i, 7), transition: 'opacity calc(240ms * var(--site-motion, 1)) var(--ease-standard)' } as CSSProperties}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -294,11 +284,13 @@ export function GoalsPage() {
 
           <div className="space-y-4">
             <Card
+              className="rise"
+              style={{ '--i': 0 } as CSSProperties}
               title="本月分配预览"
               subtitle={`按每月 ${dataset.settings.goalAllocDay} 日的分配节奏，本期可分配 ${formatMoney(monthlyBudget)}`}
               action={<Segmented size="sm" value={strategy} onChange={setStrategy} options={(['balanced', 'deadline', 'priority'] as AllocationStrategy[]).map((v) => ({ value: v, label: STRATEGY_LABELS[v] }))} />}
             >
-              <div className="overflow-x-auto">
+              <div key={strategy} className="overflow-x-auto fade-swap">
                 <table className="data">
                   <thead>
                     <tr>
@@ -344,13 +336,13 @@ export function GoalsPage() {
               </p>
             </Card>
 
-            <Card title="24 个月完成推演" subtitle="沿同一条预测现金路径滚动预留，策略切换会改变推演结果">
+            <Card className="rise" style={{ '--i': 1 } as CSSProperties} title="24 个月完成推演" subtitle="沿同一条预测现金路径滚动预留，策略切换会改变推演结果">
               {activeGoals.length === 0 ? (
                 <p className="text-[12px] text-[#8A887F]">没有进行中的目标。</p>
               ) : (
                 <>
                   <EChart option={chartOption} height={260} ariaLabel="各目标预留金额的24个月累积推演" />
-                  <div className="mt-2 overflow-x-auto">
+                  <div key={strategy} className="mt-2 overflow-x-auto fade-swap">
                     <table className="data">
                       <thead>
                         <tr><th>目标</th><th>预计完成</th><th className="text-right">需月数</th><th className="text-right">期末预留</th></tr>
@@ -382,7 +374,7 @@ export function GoalsPage() {
               </InfoNote>
             </Card>
 
-            <Card title="目标资金流水" subtitle="预留 / 释放 / 消费事件">
+            <Card className="rise" style={{ '--i': 2 } as CSSProperties} title="目标资金流水" subtitle="预留 / 释放 / 消费事件">
               {goalEvents.length === 0 ? (
                 <p className="text-[12px] text-[#8A887F]">暂无事件。</p>
               ) : (

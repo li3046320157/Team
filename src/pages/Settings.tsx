@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { CalendarRange, Check, Info, Landmark, Plus, Save, Settings2, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { addDaysISO, formatCN, todayISO } from '../domain/days';
@@ -6,7 +6,7 @@ import { formatMoney, parseMoneyInput } from '../domain/money';
 import { validateCoverage } from '../domain/ledger';
 import { wipeAllLocalData } from '../data/wipe';
 import type { AccountType, CoverageInterval } from '../domain/types';
-import { Badge, Button, Card, Field, InfoNote, Modal, Money, PageHeader, cn } from '../components/ui';
+import { Badge, Button, Card, Field, InfoNote, Modal, Money, PageHeader, Switch, cn } from '../components/ui';
 
 const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = { cash: '现金', savings: '储蓄卡', ewallet: '电子钱包' };
 
@@ -40,6 +40,7 @@ export function SettingsPage() {
   const [recurringTol, setRecurringTol] = useState(String(s.recurringToleranceDays));
   const [recurringCv, setRecurringCv] = useState(String(Math.round(s.recurringMaxCv * 100)));
   const [coverage, setCoverage] = useState<CoverageInterval[]>(() => s.coverage.map((c) => ({ ...c })));
+  const [leavingKeys, setLeavingKeys] = useState<Set<string>>(new Set());
   const [newStart, setNewStart] = useState(addDaysISO(today, -90));
   const [newEnd, setNewEnd] = useState(addDaysISO(today, -1));
   const [error, setError] = useState<string | null>(null);
@@ -117,6 +118,19 @@ export function SettingsPage() {
     setCoverage(next);
   };
 
+  const removeCoverage = (c: CoverageInterval) => {
+    const key = `${c.start}:${c.end}`;
+    setLeavingKeys((prev) => new Set(prev).add(key));
+    setTimeout(() => {
+      setCoverage((prev) => prev.filter((x) => !(x.start === c.start && x.end === c.end)));
+      setLeavingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }, 200);
+  };
+
   const submitAccount = async () => {
     const balance = parseZero(accBalance);
     if (!balance.ok) return setAccError(balance.error);
@@ -151,14 +165,14 @@ export function SettingsPage() {
         description="调整安全线、月预算、账户和检测参数，让预测与提醒更符合你的实际情况。参数会影响预测、异常检测、周期识别、目标分配与沙盘。所有金额以整数分存储。"
         actions={(
           <>
-            {savedAt && <Badge tone="teal"><Check size={11} /> {savedAt} 已保存</Badge>}
+            {savedAt && <span key={savedAt} className="badge-pop inline-flex"><Badge tone="teal"><Check size={11} /> {savedAt} 已保存</Badge></span>}
             <Button variant="primary" onClick={() => void save()} data-testid="save-settings"><Save size={14} /> 保存设置</Button>
           </>
         )}
       />
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Card title="现金流与预算" subtitle="安全储备参与风险判断，不参与余额计算" action={<ShieldCheck size={15} className="text-[#0B6357]" />}>
+        <Card className="rise" style={{ '--i': 0 } as CSSProperties} title="现金流与预算" subtitle="安全储备参与风险判断，不参与余额计算" action={<ShieldCheck size={15} className="text-[#0B6357]" />}>
           <div className="space-y-3.5">
             <Field label="安全储备（元）" hint="预测余额低于该值时提示「低于安全线」。建议至少覆盖 1-2 个月固定支出。">
               <input className="input num" inputMode="decimal" value={safety} onChange={(e) => setSafety(e.target.value)} placeholder="0" />
@@ -179,12 +193,12 @@ export function SettingsPage() {
                 <span className="flex items-center gap-1.5 text-[12.5px] font-medium"><Sparkles size={13} className="text-[#B7791F]" /> 自然语言速记</span>
                 <span className="mt-0.5 block text-[10.5px] leading-relaxed text-[#8A887F]">在记账页显示输入框，本地解析金额/商户/分类，确认后才写入。</span>
               </span>
-              <input type="checkbox" checked={quickInput} onChange={(e) => setQuickInput(e.target.checked)} className="h-4 w-4 accent-[#0E7568]" />
+              <Switch checked={quickInput} onChange={setQuickInput} aria-label="自然语言速记" />
             </label>
           </div>
         </Card>
 
-        <Card title="账户" subtitle="账户期初 + 交易 = 余额；归档账户不影响历史">
+        <Card className="rise" style={{ '--i': 1 } as CSSProperties} title="账户" subtitle="账户期初 + 交易 = 余额；归档账户不影响历史">
           <ul className="space-y-2">
             {dataset.accounts.map((acc) => (
               <li key={acc.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#EFECE6] px-3 py-2">
@@ -204,14 +218,17 @@ export function SettingsPage() {
           <InfoNote>账户本身不支持归档操作入口；期初日期决定余额计算的起点，历史交易不会早于期初。</InfoNote>
         </Card>
 
-        <Card title="历史覆盖区间" subtitle="只有登记为覆盖的日期才参与模型训练、异常与回测，避免把「没记账」误判为「没消费」" action={<CalendarRange size={15} className="text-[#0B6357]" />}>
+        <Card className="rise" style={{ '--i': 2 } as CSSProperties} title="历史覆盖区间" subtitle="只有登记为覆盖的日期才参与模型训练、异常与回测，避免把「没记账」误判为「没消费」" action={<CalendarRange size={15} className="text-[#0B6357]" />}>
           <div className="space-y-2">
-            {coverage.map((c) => (
-              <div key={`${c.start}:${c.end}`} className="flex items-center justify-between rounded-lg border border-[#EFECE6] px-3 py-2 text-[11.5px]">
-                <span>{formatCN(c.start)} — {formatCN(c.end)} <span className="text-[#8A887F]">（{intervalDays(c)} 天）</span></span>
-                <Button size="xs" variant="ghost" onClick={() => setCoverage(coverage.filter((x) => !(x.start === c.start && x.end === c.end)))}><Trash2 size={12} /></Button>
-              </div>
-            ))}
+            {coverage.map((c) => {
+              const key = `${c.start}:${c.end}`;
+              return (
+                <div key={key} className={cn('flex items-center justify-between rounded-lg border border-[#EFECE6] px-3 py-2 text-[11.5px]', leavingKeys.has(key) ? 'row-collapse' : 'fade-swap')}>
+                  <span>{formatCN(c.start)} — {formatCN(c.end)} <span className="text-[#8A887F]">（{intervalDays(c)} 天）</span></span>
+                  <Button size="xs" variant="ghost" onClick={() => removeCoverage(c)}><Trash2 size={12} /></Button>
+                </div>
+              );
+            })}
             {coverage.length === 0 && <p className="text-[12px] text-[#D97706]">尚未登记任何覆盖区间：预测将无法可靠训练可变消费模型。</p>}
           </div>
           <div className="mt-3 grid grid-cols-[1fr_1fr_auto] items-end gap-2">
@@ -222,7 +239,7 @@ export function SettingsPage() {
           <p className="mt-2 text-[10.5px] text-[#8A887F]">合计覆盖 {coveredDays} 天 · 区间不可重叠、不可包含今天或未来 · 修改后需保存。</p>
         </Card>
 
-        <Card title="小额消费聚合" subtitle="把高频小钱汇总起来看，避免「每笔都不贵」的错觉" action={<Info size={15} className="text-[#B7791F]" />}>
+        <Card className="rise" style={{ '--i': 3 } as CSSProperties} title="小额消费聚合" subtitle="把高频小钱汇总起来看，避免「每笔都不贵」的错觉" action={<Info size={15} className="text-[#B7791F]" />}>
           <div className="grid grid-cols-2 gap-3">
             <Field label="小额阈值（元）"><input className="input num" inputMode="decimal" value={smallThreshold} onChange={(e) => setSmallThreshold(e.target.value)} /></Field>
             <Field label="统计窗口（天）"><input className="input num" type="number" min={1} max={365} value={smallWindow} onChange={(e) => setSmallWindow(e.target.value)} /></Field>
@@ -232,7 +249,7 @@ export function SettingsPage() {
           </p>
         </Card>
 
-        <Card title="异常消费检测" subtitle="基于同分类历史池的 MAD 稳健 Z 分数 + IQR 兜底">
+        <Card className="rise" style={{ '--i': 4 } as CSSProperties} title="异常消费检测" subtitle="基于同分类历史池的 MAD 稳健 Z 分数 + IQR 兜底">
           <div className="grid grid-cols-3 gap-3">
             <Field label="历史窗口（天）"><input className="input num" type="number" min={7} max={730} value={anomalyWindow} onChange={(e) => setAnomalyWindow(e.target.value)} /></Field>
             <Field label="最少样本"><input className="input num" type="number" min={3} max={100} value={anomalySamples} onChange={(e) => setAnomalySamples(e.target.value)} /></Field>
@@ -243,7 +260,7 @@ export function SettingsPage() {
           </p>
         </Card>
 
-        <Card title="周期收支识别" subtitle="商户 + 金额稳定 + 间隔规律的候选计划">
+        <Card className="rise" style={{ '--i': 5 } as CSSProperties} title="周期收支识别" subtitle="商户 + 金额稳定 + 间隔规律的候选计划">
           <div className="grid grid-cols-2 gap-3">
             <Field label="间隔容差（天）"><input className="input num" type="number" min={1} max={15} value={recurringTol} onChange={(e) => setRecurringTol(e.target.value)} /></Field>
             <Field label="金额波动上限（%）"><input className="input num" type="number" min={1} max={100} value={recurringCv} onChange={(e) => setRecurringCv(e.target.value)} /></Field>
@@ -253,7 +270,7 @@ export function SettingsPage() {
           </p>
         </Card>
 
-        <Card title="本机数据" subtitle="账户、账本与 AI 配置都只存在于当前浏览器" action={<Trash2 size={15} className="text-[#98362E]" />}>
+        <Card className="rise" style={{ '--i': 6 } as CSSProperties} title="本机数据" subtitle="账户、账本与 AI 配置都只存在于当前浏览器" action={<Trash2 size={15} className="text-[#98362E]" />}>
           <p className="text-[11.5px] leading-relaxed text-[#6B6A63]">
             清除后会删除本机所有账户、账本、目标与 AI 接口配置，并回到登录页；此操作无法撤销，请先到数据中心导出备份。
           </p>
@@ -262,7 +279,7 @@ export function SettingsPage() {
           </Button>
         </Card>
 
-        <Card title="关于与数据原则" subtitle="MoneyFlow 钱流 · 本地优先的个人现金流工作台" action={<Settings2 size={15} className="text-[#8A887F]" />}>
+        <Card className="rise" style={{ '--i': 7 } as CSSProperties} title="关于与数据原则" subtitle="MoneyFlow 钱流 · 本地优先的个人现金流工作台" action={<Settings2 size={15} className="text-[#8A887F]" />}>
           <ul className="space-y-2 text-[11.5px] leading-relaxed text-[#6B6A63]">
             <li>版本 1.0.0 · 数据格式 v1 · 设置版本 v{s.settingsVersion}</li>
             <li>所有数据存于浏览器 IndexedDB，不上传；备份文件由你自行保管。</li>

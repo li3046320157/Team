@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { ChangeEvent } from 'react';
 import { BrainCircuit, Download, FileJson, FileSpreadsheet, HardDriveDownload, History, RotateCcw, ShieldAlert, Trash2, Upload } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
@@ -8,7 +8,7 @@ import { createBackup, validateBackupText, type BackupValidation } from '../doma
 import { downloadTextFile, transactionsToCSV } from '../domain/csv';
 import { resetCalibration, recentSnapshots, runBacktest } from '../services/snapshots';
 import type { BacktestResult } from '../domain/calibration';
-import { Badge, Button, Card, InfoNote, Modal, Money, PageHeader, cn } from '../components/ui';
+import { Badge, Button, Card, InfoNote, Modal, Money, PageHeader, StatCard, cn } from '../components/ui';
 import { weekdayCN } from '../lib/ui';
 
 export function DataCenterPage() {
@@ -143,28 +143,14 @@ export function DataCenterPage() {
       />
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="card px-4 py-3">
-          <p className="text-[10.5px] font-semibold tracking-wide text-[#8A887F]">账户 / 交易</p>
-          <p className="num mt-1 text-[19px] font-semibold">{dataset.accounts.length} / {dataset.transactions.length}</p>
-        </div>
-        <div className="card px-4 py-3">
-          <p className="text-[10.5px] font-semibold tracking-wide text-[#8A887F]">计划 / 目标 / 方案</p>
-          <p className="num mt-1 text-[19px] font-semibold">{dataset.flows.length} / {dataset.goals.length} / {dataset.plans.length}</p>
-        </div>
-        <div className="card px-4 py-3">
-          <p className="text-[10.5px] font-semibold tracking-wide text-[#8A887F]">预测快照</p>
-          <p className="num mt-1 text-[19px] font-semibold">{dataset.snapshots.length}</p>
-          {lastBalance !== undefined && <p className="num text-[10px] text-[#8A887F]">最近期末余额 {formatMoney(lastBalance)}</p>}
-        </div>
-        <div className="card px-4 py-3">
-          <p className="text-[10.5px] font-semibold tracking-wide text-[#8A887F]">校准记录（有效）</p>
-          <p className="num mt-1 text-[19px] font-semibold">{activeCal}</p>
-          <p className="text-[10px] text-[#8A887F]">{gapCount === 0 ? '未登记历史覆盖区间' : `${gapCount} 个覆盖区间`}</p>
-        </div>
+        <StatCard label="账户 / 交易" value={`${dataset.accounts.length} / ${dataset.transactions.length}`} />
+        <StatCard label="计划 / 目标 / 方案" value={`${dataset.flows.length} / ${dataset.goals.length} / ${dataset.plans.length}`} />
+        <StatCard label="预测快照" value={dataset.snapshots.length} hint={lastBalance !== undefined ? `最近期末余额 ${formatMoney(lastBalance)}` : undefined} />
+        <StatCard label="校准记录（有效）" value={activeCal} hint={gapCount === 0 ? '未登记历史覆盖区间' : `${gapCount} 个覆盖区间`} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Card title="JSON 完整备份" subtitle="包含账本、计划、目标、快照与校准；恢复会覆盖当前数据集">
+        <Card className="rise" style={{ '--i': 0 } as CSSProperties} title="JSON 完整备份" subtitle="包含账本、计划、目标、快照与校准；恢复会覆盖当前数据集">
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={exportBackup}><Download size={14} /> 下载备份</Button>
             <Button variant="secondary" onClick={() => fileRef.current?.click()} data-testid="import-backup"><Upload size={14} /> 选择备份文件</Button>
@@ -177,7 +163,7 @@ export function DataCenterPage() {
           {importError && <p className="mt-3 rounded-lg bg-[#FCF1EF] px-3 py-2 text-[12px] text-[#98362E]">{importError}</p>}
 
           {importResult && (
-            <div className="mt-3 rounded-xl border border-[#EFECE6] p-3" data-testid="import-preview">
+            <div className="mt-3 rounded-xl border border-[#EFECE6] p-3 fade-swap" data-testid="import-preview">
               <div className="flex items-center justify-between gap-2">
                 <p className="truncate text-[12px] font-medium"><FileJson size={12} className="mr-1 inline" />{importName || '备份文件'}</p>
                 {importResult.ok ? <Badge tone="teal">校验通过</Badge> : <Badge tone="danger">校验失败</Badge>}
@@ -221,7 +207,7 @@ export function DataCenterPage() {
           </InfoNote>
         </Card>
 
-        <Card title="CSV 交易导出" subtitle="UTF-8 BOM，Excel 可直接打开；以 = + - @ 开头的文本会加前缀防公式注入">
+        <Card className="rise" style={{ '--i': 1 } as CSSProperties} title="CSV 交易导出" subtitle="UTF-8 BOM，Excel 可直接打开；以 = + - @ 开头的文本会加前缀防公式注入">
           <div className="rounded-lg border border-dashed border-[#DED9CF] px-3 py-4 text-center">
             <FileSpreadsheet size={22} className="mx-auto text-[#0B6357]" />
             <p className="mt-1.5 text-[12px] font-medium">{dataset.transactions.length} 笔交易</p>
@@ -233,7 +219,7 @@ export function DataCenterPage() {
           </p>
         </Card>
 
-        <Card title="预测快照与校准" subtitle={lastSnapshot ? `最近快照：${formatCN(lastSnapshot.asOfDate)} · ${lastSnapshot.auto ? '每日自动' : '手动'} · ${lastSnapshot.horizonDays} 天` : '还没有快照'}>
+        <Card className="rise" style={{ '--i': 2 } as CSSProperties} title="预测快照与校准" subtitle={lastSnapshot ? `最近快照：${formatCN(lastSnapshot.asOfDate)} · ${lastSnapshot.auto ? '每日自动' : '手动'} · ${lastSnapshot.horizonDays} 天` : '还没有快照'}>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="secondary" onClick={() => void makeSnapshot()} data-testid="manual-snapshot"><History size={13} /> 保存手动快照</Button>
             <Button size="sm" variant="primary" disabled={busy === 'calibrate'} onClick={() => void doCalibration()} data-testid="run-calibration"><BrainCircuit size={13} /> 运行校准</Button>
@@ -245,7 +231,7 @@ export function DataCenterPage() {
             <span className="font-semibold text-[#3A3D37]">校准状态</span> · alpha {dataset.settings.calibration.alpha.toFixed(2)} · 版本 {dataset.settings.calibration.version}
             <div className="mt-1 flex flex-wrap gap-1.5">
               {[0, 1, 2, 3, 4, 5, 6].map((wd) => (
-                <span key={wd} className="rounded bg-white px-1.5 py-0.5 num">
+                <span key={wd} className="rise inline-block rounded bg-white px-1.5 py-0.5 num" style={{ '--d': `${wd * 28}ms` } as CSSProperties}>
                   {weekdayCN(wd)} {formatMoney(dataset.settings.calibration.weekdayBias[wd] ?? 0)}
                 </span>
               ))}
@@ -270,7 +256,7 @@ export function DataCenterPage() {
           </div>
 
           {backtest && (
-            <div className="mt-3 rounded-xl border border-[#E4E0D8] p-3" data-testid="backtest-result">
+            <div className="mt-3 rounded-xl border border-[#E4E0D8] p-3 fade-swap" data-testid="backtest-result">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[12px] font-semibold">回测结果 <span className="font-normal text-[#8A887F]">({backtest.at})</span></p>
                 <Badge tone={backtest.result.sufficient ? 'teal' : 'amber'}>{backtest.result.sufficient ? `样本 ${backtest.result.calibrated.samples} 天` : '样本不足'}</Badge>
@@ -317,7 +303,7 @@ export function DataCenterPage() {
           </InfoNote>
         </Card>
 
-        <Card title="危险操作" subtitle="以下操作不可撤销，执行前请先下载备份">
+        <Card className="rise" style={{ '--i': 3 } as CSSProperties} title="危险操作" subtitle="以下操作不可撤销，执行前请先下载备份">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#F3D9D5] bg-[#FDF7F6] px-3 py-2.5">
               <div>

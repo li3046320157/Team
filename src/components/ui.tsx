@@ -173,10 +173,30 @@ export function Badge({ tone = 'gray', children }: { tone?: 'teal' | 'amber' | '
 
 export function Progress({ value, max, tone = 'teal' }: { value: number; max: number; tone?: 'teal' | 'amber' | 'danger' }) {
   const pct = max <= 0 ? 0 : Math.min(100, Math.max(0, (value / max) * 100));
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    let raf2 = 0;
+    let fired = false;
+    const fire = () => {
+      if (fired) return;
+      fired = true;
+      setWidth(pct);
+    };
+    // double-rAF：让 0 起始态先渲染一帧，再切到目标值以触发过渡；后台标签页 rAF 被节流时由定时器兜底
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(fire);
+    });
+    const fallback = setTimeout(fire, 120);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      clearTimeout(fallback);
+    };
+  }, [pct]);
   const color = tone === 'danger' ? '#B5453C' : tone === 'amber' ? '#B7791F' : '#0E7568';
   return (
     <div className="h-2 w-full overflow-hidden rounded-full bg-[#EFECE6]">
-      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: color }} />
+      <div className="h-full rounded-full" style={{ width: `${width}%`, background: color, transition: 'width calc(400ms * var(--site-motion, 1)) var(--ease-enter)' }} />
     </div>
   );
 }
