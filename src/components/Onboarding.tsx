@@ -47,7 +47,7 @@ export function Onboarding() {
       <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <div className="pt-2">
           <div className="rise flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#0E7568] text-[22px] font-bold text-white">¥</div>
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--accent)] text-[22px] font-bold text-white">¥</div>
             <div>
               <p className="text-[22px] font-semibold tracking-tight">MoneyFlow 钱流</p>
               <p className="text-[11.5px] tracking-[0.16em] text-[#8A887F]">看清现金流向，再做消费决定</p>
@@ -68,7 +68,7 @@ export function Onboarding() {
               { icon: Sparkles, title: '预测标注假设与来源', desc: '历史不足时明确「未估计」；校准与回测结果如实展示。' },
             ].map((item, i) => (
               <li key={item.title} className="rise flex gap-3" style={{ '--i': i } as CSSProperties}>
-                <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#E3F1ED] text-[#0B6357]">
+                <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-ink)]">
                   <item.icon size={16} />
                 </div>
                 <div>

@@ -20,10 +20,11 @@ import {
 } from '../services/mutations';
 import { EChart } from '../components/Chart';
 import { Badge, Button, Card, EmptyState, Field, InfoNote, Modal, Money, PageHeader, Progress, Segmented, StatCard, cn } from '../components/ui';
+import { cssColor } from '../theme/palette';
 
 type ActionMode = 'reserve' | 'release' | 'consume' | null;
 
-const LINE_COLORS = ['#0E7568', '#B7791F', '#3F6E9A', '#8C6A9E', '#7A8B4A', '#B5453C'];
+const LINE_COLORS = ['#B7791F', '#3F6E9A', '#8C6A9E', '#7A8B4A', '#B5453C'];
 
 function daysLeft(deadline: string, today: string): number {
   return diffDays(today, deadline);
@@ -87,6 +88,7 @@ export function GoalsPage() {
   );
 
   const chartOption = useMemo<EChartsOption>(() => {
+    const lineColors = [cssColor('--accent', '#0e7568'), ...LINE_COLORS];
     const active = dataset.goals.filter((g) => g.status === 'active');
     const dates = new Set<string>([today]);
     for (const o of projection.outcomes) for (const p of o.series) dates.add(p.date);
@@ -109,8 +111,8 @@ export function GoalsPage() {
         step: 'end' as const,
         showSymbol: false,
         data,
-        lineStyle: { width: 2, color: LINE_COLORS[i % LINE_COLORS.length] },
-        itemStyle: { color: LINE_COLORS[i % LINE_COLORS.length] },
+        lineStyle: { width: 2, color: lineColors[i % lineColors.length] },
+        itemStyle: { color: lineColors[i % lineColors.length] },
       };
     });
     return {
@@ -242,7 +244,7 @@ export function GoalsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#E8F3F0] text-[#0B6357]"><Target size={15} /></span>
+                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-ink)]"><Target size={15} /></span>
                         <div>
                           <p className="truncate text-[13.5px] font-semibold">{goal.name}</p>
                           <p className="text-[10.5px] text-[#8A887F]">
@@ -258,7 +260,7 @@ export function GoalsPage() {
                   <div className="mt-3">
                     <div className="mb-1 flex items-end justify-between text-[11px] text-[#6B6A63]">
                       <span>已预留 <Money cents={reserved} /> / <Money cents={goal.targetAmount} /></span>
-                      <span className="num font-semibold text-[#0B6357]">{pct}%</span>
+                      <span className="num font-semibold text-[var(--accent-ink)]">{pct}%</span>
                     </div>
                     <Progress value={reserved} max={goal.targetAmount} tone={left < 0 && remaining > 0 ? 'danger' : pct >= 100 ? 'teal' : 'amber'} />
                     <p className="mt-1 text-[10.5px] text-[#8A887F]">还差 <Money cents={remaining} /></p>
@@ -382,7 +384,7 @@ export function GoalsPage() {
                   {goalEvents.map((ev) => {
                     const g = goalById.get(ev.goalId ?? '');
                     const label = ev.type === 'reserve' ? '预留' : ev.type === 'release' ? '释放' : '消费';
-                    const tone = ev.type === 'reserve' ? 'text-[#0B6357]' : ev.type === 'consume' ? 'text-[#98362E]' : 'text-[#8A5A13]';
+                    const tone = ev.type === 'reserve' ? 'text-[var(--accent-ink)]' : ev.type === 'consume' ? 'text-[#98362E]' : 'text-[#8A5A13]';
                     return (
                       <li key={ev.id} className="flex items-center justify-between gap-2 py-1.5 text-[11.5px]">
                         <span className="flex min-w-0 items-center gap-1.5">

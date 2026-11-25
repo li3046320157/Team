@@ -276,7 +276,7 @@ export function LedgerPage() {
               </div>
               <div className="num flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[#F0EDE6] pt-2 text-[11.5px] text-[#6B6A63]">
                 <span className="text-[#8A887F]">{fullDateCN(start)} – {fullDateCN(end)} · {dayCount} 天</span>
-                <span>收入 <span className="font-semibold text-[#0B6357]">{formatMoney(stats.income)}</span></span>
+                <span>收入 <span className="font-semibold text-[var(--accent-ink)]">{formatMoney(stats.income)}</span></span>
                 <span>支出 <span className="font-semibold text-[#98362E]">{formatMoney(stats.expense)}</span></span>
                 <span>结余 <span className="font-semibold text-[#1F2421]">{formatMoney(stats.net)}</span></span>
                 <span>日均支出 <span className="font-semibold text-[#1F2421]">{formatMoney(dailyExpense)}</span></span>
@@ -302,7 +302,7 @@ export function LedgerPage() {
                           {label}
                           {groupUnit !== 'day' && <span className="ml-1 font-normal text-[#A3A097]">· {txns.length} 笔</span>}
                         </p>
-                        <span className={cn('num text-[10.5px]', groupNet >= 0 ? 'text-[#0B6357]' : 'text-[#98362E]')}>
+                        <span className={cn('num text-[10.5px]', groupNet >= 0 ? 'text-[var(--accent-ink)]' : 'text-[#98362E]')}>
                           {groupNet >= 0 ? '+' : ''}{formatMoney(groupNet)}
                         </span>
                       </div>
@@ -328,7 +328,7 @@ export function LedgerPage() {
                                   {t.note && t.merchant ? ` · ${t.note}` : ''}
                                 </p>
                               </div>
-                              <span className={cn('num shrink-0 text-[13px] font-semibold', t.kind === 'income' ? 'text-[#0B6357]' : t.kind === 'expense' ? 'text-[#1F2421]' : 'text-[#6B6A63]')}>
+                              <span className={cn('num shrink-0 text-[13px] font-semibold', t.kind === 'income' ? 'text-[var(--accent-ink)]' : t.kind === 'expense' ? 'text-[#1F2421]' : 'text-[#6B6A63]')}>
                                 {t.kind === 'income' ? '+' : t.kind === 'expense' ? '−' : '⇄'}{formatMoney(t.amount)}
                               </span>
                               <div className="flex shrink-0 gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
@@ -375,7 +375,7 @@ export function LedgerPage() {
                           <span className="num text-[#6B6A63]">{formatMoney(value)}</span>
                         </div>
                         <div className="h-1.5 overflow-hidden rounded-full bg-[#EFECE6]">
-                          <div className="h-full rounded-full bg-[#0E7568]/70" style={{ width: `${total > 0 ? (value / total) * 100 : 0}%` }} />
+                          <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${total > 0 ? (value / total) * 100 : 0}%` }} />
                         </div>
                       </li>
                     );
@@ -393,7 +393,7 @@ export function LedgerPage() {
               <li>• 目标购买流水带「目标」标记，预留同步消耗，可支配金额不重复减少。</li>
               <li>• 修改或删除某天流水会失效该日已有校准记录。</li>
             </ul>
-            <div className="mt-3 flex items-start gap-2 rounded-lg bg-[#E3F1ED]/60 px-3 py-2 text-[11px] leading-relaxed text-[#0B6357]">
+            <div className="mt-3 flex items-start gap-2 rounded-lg bg-[var(--accent-soft)] px-3 py-2 text-[11px] leading-relaxed text-[var(--accent-ink)]">
               <Sparkles size={13} className="mt-0.5 shrink-0" />
               快速记账只做规则解析，不会自动提交；退款、否定语义会被拦截。
             </div>

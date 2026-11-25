@@ -78,7 +78,7 @@ export function App() {
     return (
       <div className="grid min-h-screen place-items-center">
         <div className="card flex w-[280px] flex-col items-center gap-3 p-8">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#0E7568] text-xl font-bold text-white">¥</div>
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[var(--accent)] text-xl font-bold text-white">¥</div>
           <Spinner label="正在打开本地账本…" />
         </div>
       </div>
@@ -101,7 +101,7 @@ export function App() {
     return (
       <div className="grid min-h-screen place-items-center">
         <div className="card flex w-[280px] flex-col items-center gap-3 p-8">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#0E7568] text-xl font-bold text-white">¥</div>
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[var(--accent)] text-xl font-bold text-white">¥</div>
           <Spinner label="正在打开本地账本…" />
         </div>
       </div>

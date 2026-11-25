@@ -209,7 +209,7 @@ export function DataCenterPage() {
 
         <Card className="rise" style={{ '--i': 1 } as CSSProperties} title="CSV 交易导出" subtitle="UTF-8 BOM，Excel 可直接打开；以 = + - @ 开头的文本会加前缀防公式注入">
           <div className="rounded-lg border border-dashed border-[#DED9CF] px-3 py-4 text-center">
-            <FileSpreadsheet size={22} className="mx-auto text-[#0B6357]" />
+            <FileSpreadsheet size={22} className="mx-auto text-[var(--accent-ink)]" />
             <p className="mt-1.5 text-[12px] font-medium">{dataset.transactions.length} 笔交易</p>
             <p className="text-[10.5px] text-[#8A887F]">列：日期 / 类型 / 金额 / 账户 / 分类 / 商户 / 备注 / 关联</p>
             <Button variant="secondary" size="sm" className="mt-2" onClick={exportCSV}><Download size={13} /> 下载 CSV</Button>

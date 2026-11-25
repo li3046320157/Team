@@ -193,7 +193,7 @@ export function Progress({ value, max, tone = 'teal' }: { value: number; max: nu
     );
   }, { dependencies: [pct], scope: hostRef, revertOnUpdate: true });
 
-  const color = tone === 'danger' ? '#B5453C' : tone === 'amber' ? '#B7791F' : '#0E7568';
+  const color = tone === 'danger' ? 'var(--danger)' : tone === 'amber' ? 'var(--accent-2)' : 'var(--accent)';
   return (
     <div ref={hostRef} className="h-2 w-full overflow-hidden rounded-full bg-[#EFECE6]">
       <div ref={barRef} className="h-full w-full rounded-full" style={{ background: color, transform: 'scaleX(0)', transformOrigin: 'left center' }} />
@@ -292,7 +292,7 @@ export function Segmented<T extends string>({
           className={cn(
             'rounded-lg font-medium transition-all',
             size === 'sm' ? 'px-2.5 py-1 text-[11.5px]' : 'px-3 py-1.5 text-xs',
-            value === opt.value ? 'bg-white text-[#0B6357] shadow-sm' : 'text-[#6B6A63] hover:text-[#1F2421]',
+            value === opt.value ? 'bg-white text-[var(--accent-ink)] shadow-sm' : 'text-[#6B6A63] hover:text-[#1F2421]',
           )}
         >
           {opt.label}
@@ -408,7 +408,7 @@ export function Toast() {
         key={toast.id}
         className={cn(
           'toast-pop flex max-w-md items-start gap-2 rounded-xl border px-4 py-3 text-[13px] shadow-xl',
-          toast.kind === 'success' && 'border-[#CBE5DD] bg-[#F1FAF7] text-[#0B6357]',
+          toast.kind === 'success' && 'border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent-ink)]',
           toast.kind === 'error' && 'border-[#EBCBC6] bg-[#FCF1EF] text-[#98362E]',
           toast.kind === 'info' && 'border-[#E4E0D8] bg-white text-[#3A3D37]',
         )}
@@ -427,11 +427,21 @@ export function Toast() {
 export function Spinner({ label = '加载中…' }: { label?: string }) {
   return (
     <div className="flex items-center justify-center gap-2 py-10 text-sm text-[#6B6A63]">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#CFC9BD] border-t-[#0E7568]" />
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#CFC9BD] border-t-[var(--accent)]" />
       {label}
     </div>
   );
 }
+
+const STAT_TONES = {
+  accent: ['var(--accent)', 'var(--accent-ink)'],
+  teal: ['var(--accent)', 'var(--accent-ink)'],
+  accent2: ['var(--accent-2)', 'var(--accent-2-ink)'],
+  amber: ['var(--accent-2)', 'var(--accent-2-ink)'],
+  positive: ['var(--tone-green)', 'var(--tone-green)'],
+  warning: ['var(--tone-amber)', 'var(--tone-amber)'],
+  danger: ['var(--danger)', '#98362E'],
+} as const;
 
 export function StatCard({
   label,
@@ -443,29 +453,27 @@ export function StatCard({
   label: string;
   value: ReactNode;
   hint?: ReactNode;
-  tone?: 'default' | 'teal' | 'amber' | 'danger';
+  tone?: 'default' | keyof typeof STAT_TONES;
   className?: string;
 }) {
+  const pair = tone === 'default' ? undefined : STAT_TONES[tone];
   return (
-    <div className={cn('card stat-in p-4 sm:p-5', className)}>
-      <p className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[#8A887F]">{label}</p>
-      <div
-        className={cn(
-          'num mt-2 text-[24px] font-semibold tracking-[-0.02em]',
-          tone === 'teal' && 'text-[#0B6357]',
-          tone === 'amber' && 'text-[#8A5A13]',
-          tone === 'danger' && 'text-[#98362E]',
-        )}
-      >
-        {value}
-      </div>
+    <div
+      className={cn('card stat-card stat-in p-4 sm:p-5', className)}
+      style={pair ? ({ '--stat-tone': pair[0], '--stat-ink': pair[1] } as CSSProperties) : undefined}
+    >
+      <p className="flex items-center gap-2 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[#8A887F]">
+        {pair && <span className="stat-dot" aria-hidden="true" />}
+        {label}
+      </p>
+      <div className="num stat-value mt-2 text-[24px] font-semibold tracking-[-0.02em]">{value}</div>
       {hint && <div className="mt-1.5 text-[11.5px] leading-relaxed text-[#8A887F]">{hint}</div>}
     </div>
   );
 }
 
 export function CheckMark({ ok }: { ok: boolean }) {
-  return ok ? <Check size={14} className="text-[#0B6357]" /> : <X size={14} className="text-[#B5453C]" />;
+  return ok ? <Check size={14} className="text-[var(--accent-ink)]" /> : <X size={14} className="text-[#B5453C]" />;
 }
 
 export function TransferIcon() {

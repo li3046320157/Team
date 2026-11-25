@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { CalendarRange, Check, Info, Landmark, Plus, Save, Settings2, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
+import { CalendarRange, Check, Info, Landmark, Palette, Plus, Save, Settings2, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { addDaysISO, formatCN, todayISO } from '../domain/days';
 import { formatMoney, parseMoneyInput } from '../domain/money';
@@ -7,6 +7,7 @@ import { validateCoverage } from '../domain/ledger';
 import { wipeAllLocalData } from '../data/wipe';
 import type { AccountType, CoverageInterval } from '../domain/types';
 import { Badge, Button, Card, Field, InfoNote, Modal, Money, PageHeader, Segmented, Switch, cn } from '../components/ui';
+import { PalettePicker } from '../components/PalettePicker';
 import { getMotionLevel, setMotionLevel, type MotionLevel } from '../motion/preference';
 
 const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = { cash: '现金', savings: '储蓄卡', ewallet: '电子钱包' };
@@ -180,7 +181,7 @@ export function SettingsPage() {
       />
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Card className="rise" style={{ '--i': 0 } as CSSProperties} title="现金流与预算" subtitle="安全储备参与风险判断，不参与余额计算" action={<ShieldCheck size={15} className="text-[#0B6357]" />}>
+        <Card className="rise" style={{ '--i': 0 } as CSSProperties} title="现金流与预算" subtitle="安全储备参与风险判断，不参与余额计算" action={<ShieldCheck size={15} className="text-[var(--accent-ink)]" />}>
           <div className="space-y-3.5">
             <Field label="安全储备（元）" hint="预测余额低于该值时提示「低于安全线」。建议至少覆盖 1-2 个月固定支出。">
               <input className="input num" inputMode="decimal" value={safety} onChange={(e) => setSafety(e.target.value)} placeholder="0" />
@@ -211,7 +212,7 @@ export function SettingsPage() {
             {dataset.accounts.map((acc) => (
               <li key={acc.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#EFECE6] px-3 py-2">
                 <div className="flex items-center gap-2">
-                  <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#F4F1EA] text-[#0B6357]"><Landmark size={13} /></span>
+                  <span className="grid h-7 w-7 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-ink)]"><Landmark size={13} /></span>
                   <div>
                     <p className="text-[12px] font-medium">{acc.name} <span className="font-normal text-[#8A887F]">· {ACCOUNT_TYPE_LABEL[acc.type]}</span></p>
                     <p className="text-[10px] text-[#8A887F]">期初 {formatCN(acc.openingDate)} · {formatMoney(acc.openingBalance)}</p>
@@ -226,7 +227,7 @@ export function SettingsPage() {
           <InfoNote>账户本身不支持归档操作入口；期初日期决定余额计算的起点，历史交易不会早于期初。</InfoNote>
         </Card>
 
-        <Card className="rise" style={{ '--i': 2 } as CSSProperties} title="历史覆盖区间" subtitle="只有登记为覆盖的日期才参与模型训练、异常与回测，避免把「没记账」误判为「没消费」" action={<CalendarRange size={15} className="text-[#0B6357]" />}>
+        <Card className="rise" style={{ '--i': 2 } as CSSProperties} title="历史覆盖区间" subtitle="只有登记为覆盖的日期才参与模型训练、异常与回测，避免把「没记账」误判为「没消费」" action={<CalendarRange size={15} className="text-[var(--accent-ink)]" />}>
           <div className="space-y-2">
             {coverage.map((c) => {
               const key = `${c.start}:${c.end}`;
@@ -278,7 +279,12 @@ export function SettingsPage() {
           </p>
         </Card>
 
-        <Card className="rise" style={{ '--i': 6 } as CSSProperties} title="界面动效" subtitle="默认完整展示，不依赖系统设置；可随时切换为精简" action={<Sparkles size={15} className="text-[#0B6357]" />}>
+        <Card className="rise" style={{ '--i': 6 } as CSSProperties} title="界面配色" subtitle="主色会同步到按钮、图表、导航与账本封面" action={<Palette size={15} className="text-[var(--accent-ink)]" />}>
+          <PalettePicker onChange={(p) => notify(`已切换为「${p.name}」配色`, 'success')} />
+          <p className="mt-3 text-[10.5px] leading-relaxed text-[#8A887F]">配色仅保存在本机，切换后无需刷新；账目数据不受影响。</p>
+        </Card>
+
+        <Card className="rise" style={{ '--i': 7 } as CSSProperties} title="界面动效" subtitle="默认完整展示，不依赖系统设置；可随时切换为精简" action={<Sparkles size={15} className="text-[var(--accent-ink)]" />}>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#E4E0D8] bg-[#FCFBF8] px-3 py-2.5">
             <div>
               <p className="text-[12.5px] font-medium">动效强度</p>
@@ -297,7 +303,7 @@ export function SettingsPage() {
           <p className="mt-2 text-[10.5px] leading-relaxed text-[#8A887F]">偏好保存在本机，只影响当前浏览器的展示效果。</p>
         </Card>
 
-        <Card className="rise" style={{ '--i': 7 } as CSSProperties} title="本机数据" subtitle="账户、账本与 AI 配置都只存在于当前浏览器" action={<Trash2 size={15} className="text-[#98362E]" />}>
+        <Card className="rise" style={{ '--i': 8 } as CSSProperties} title="本机数据" subtitle="账户、账本与 AI 配置都只存在于当前浏览器" action={<Trash2 size={15} className="text-[#98362E]" />}>
           <p className="text-[11.5px] leading-relaxed text-[#6B6A63]">
             清除后会删除本机所有账户、账本、目标与 AI 接口配置，并回到登录页；此操作无法撤销，请先到数据中心导出备份。
           </p>
@@ -306,7 +312,7 @@ export function SettingsPage() {
           </Button>
         </Card>
 
-        <Card className="rise" style={{ '--i': 8 } as CSSProperties} title="关于与数据原则" subtitle="MoneyFlow 钱流 · 本地优先的个人现金流工作台" action={<Settings2 size={15} className="text-[#8A887F]" />}>
+        <Card className="rise" style={{ '--i': 9 } as CSSProperties} title="关于与数据原则" subtitle="MoneyFlow 钱流 · 本地优先的个人现金流工作台" action={<Settings2 size={15} className="text-[#8A887F]" />}>
           <ul className="space-y-2 text-[11.5px] leading-relaxed text-[#6B6A63]">
             <li>版本 1.0.0 · 数据格式 v1 · 设置版本 v{s.settingsVersion}</li>
             <li>所有数据存于浏览器 IndexedDB，不上传；备份文件由你自行保管。</li>

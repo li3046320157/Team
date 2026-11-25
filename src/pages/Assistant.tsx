@@ -218,7 +218,7 @@ export function AssistantPage() {
                     placeholder="sk-…"
                     data-testid="ai-key"
                   />
-                  <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-[11px] font-semibold text-[#0B6357]" onClick={() => setShowKey((v) => !v)}>
+                  <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-[11px] font-semibold text-[var(--accent-ink)]" onClick={() => setShowKey((v) => !v)}>
                     {showKey ? '隐藏' : '显示'}
                   </button>
                 </div>
@@ -255,7 +255,7 @@ export function AssistantPage() {
           <div ref={scrollRef} className="scroll-thin mb-3 h-[420px] space-y-3 overflow-y-auto rounded-xl border border-[#EFECE6] bg-[#FCFBF7] p-4">
             {messages.length === 0 && (
               <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#E3F1ED] text-[#0B6357]"><Bot size={22} /></div>
+                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-ink)]"><Bot size={22} /></div>
                 <p className="text-[13px] font-semibold text-[#3A3D37]">让 AI 帮你读账本</p>
                 <p className="max-w-sm text-[12px] leading-relaxed text-[#8A887F]">
                   先配置左侧接口，然后点击下方问题或直接提问。每次提问都会附上当前余额、本月收支、90 天预测与目标进摘要。
@@ -264,13 +264,13 @@ export function AssistantPage() {
             )}
             {messages.map((m, i) => (
               <div key={i} className={cn('flex gap-2.5', m.role === 'user' && 'flex-row-reverse')}>
-                <div className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-lg', m.role === 'user' ? 'bg-[#EFECE6] text-[#6B6A63]' : 'bg-[#E3F1ED] text-[#0B6357]')}>
+                <div className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-lg', m.role === 'user' ? 'bg-[#EFECE6] text-[#6B6A63]' : 'bg-[var(--accent-soft)] text-[var(--accent-ink)]')}>
                   {m.role === 'user' ? <User size={14} /> : <Bot size={14} />}
                 </div>
                 <div
                   className={cn(
                     'max-w-[85%] whitespace-pre-wrap rounded-xl px-3.5 py-2.5 text-[12.5px] leading-relaxed',
-                    m.role === 'user' ? 'bg-[#0E7568] text-white' : 'border border-[#E4E0D8] bg-white text-[#1F2421]',
+                    m.role === 'user' ? 'bg-[var(--accent)] text-white' : 'border border-[#E4E0D8] bg-white text-[#1F2421]',
                     i === leavingIdx ? 'row-collapse' : 'rise',
                   )}
                   style={{ '--rise-x': m.role === 'user' ? '6px' : '-6px' } as CSSProperties}
@@ -290,7 +290,7 @@ export function AssistantPage() {
               <button
                 key={q}
                 type="button"
-                className="rise rounded-full border border-[#E4E0D8] bg-white px-3 py-1.5 text-[11.5px] font-medium text-[#0B6357] transition hover:border-[#0E7568] hover:bg-[#E3F1ED] disabled:opacity-50"
+                className="rise rounded-full border border-[#E4E0D8] bg-white px-3 py-1.5 text-[11.5px] font-medium text-[var(--accent-ink)] transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] disabled:opacity-50"
                 style={{ '--i': i } as CSSProperties}
                 onClick={() => void send(q)}
                 disabled={streaming || !savedConfig}

@@ -94,7 +94,7 @@ export function InsightsPage() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-2.5">
-                      <span className="mt-0.5 grid h-8 w-8 place-items-center rounded-lg bg-[#E3F1ED] text-[#0B6357]"><Repeat2 size={15} /></span>
+                      <span className="mt-0.5 grid h-8 w-8 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-ink)]"><Repeat2 size={15} /></span>
                       <div>
                         <p className="text-[13px] font-semibold">{c.merchantLabel}</p>
                         <p className="text-[11px] text-[#8A887F]">{frequencyLabel(c.unit, c.interval)} · 约 <Money cents={c.estimatedAmount} /> · 下次 {formatCN(c.nextDate)}</p>
@@ -233,7 +233,7 @@ export function InsightsPage() {
                   ))}
                 </ul>
                 {reviewed.some((c) => c.status === 'confirmed') && (
-                  <Link to="/schedules" className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-semibold text-[#0B6357] hover:underline">
+                  <Link to="/schedules" className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-semibold text-[var(--accent-ink)] hover:underline">
                     <CalendarClock size={12} /> 去计划页查看
                   </Link>
                 )}
