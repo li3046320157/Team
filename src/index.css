@@ -590,13 +590,15 @@ table.data tbody tr:hover {
 }
 
 .ledger-row {
-  transition: transform 160ms ease, background 160ms ease;
+  transition:
+    transform calc(var(--dur-2) * var(--site-motion, 1)) var(--ease-standard),
+    background calc(var(--dur-2) * var(--site-motion, 1)) var(--ease-standard);
 }
 .ledger-row:hover {
   transform: translateY(-1px);
 }
 .row-icon {
-  transition: transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform calc(var(--dur-2) * var(--site-motion, 1)) var(--ease-standard);
 }
 .ledger-row:hover .row-icon {
   transform: rotate(-8deg) scale(1.12);
@@ -682,10 +684,10 @@ table.data tbody tr:hover {
   place-items: center;
 }
 .digit-roll-old {
-  animation: digitOut calc(280ms * var(--site-motion, 1)) cubic-bezier(0.55, 0, 0.8, 0.4) var(--d, 0ms) both;
+  animation: digitOut calc(280ms * var(--site-motion, 1)) cubic-bezier(0.55, 0, 0.8, 0.4) calc(var(--d, 0ms) * var(--site-motion, 1)) both;
 }
 .digit-roll-new {
-  animation: digitIn calc(320ms * var(--site-motion, 1)) var(--ease-digit) calc(var(--d, 0ms) + 40ms) both;
+  animation: digitIn calc(320ms * var(--site-motion, 1)) var(--ease-digit) calc((var(--d, 0ms) + 40ms) * var(--site-motion, 1)) both;
 }
 @keyframes digitOut {
   from {
@@ -970,7 +972,9 @@ table.data tbody tr:hover {
   .row-collapse,
   .switch,
   .switch-knob,
-  .config-collapse {
+  .config-collapse,
+  .ledger-row,
+  .row-icon {
     transition: none;
   }
   .burst-coin {
