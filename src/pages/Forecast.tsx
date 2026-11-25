@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarClock, Camera, CircleHelp, Info, TriangleAlert } from 'lucide-react';
 import type { EChartsOption } from 'echarts';
@@ -36,7 +36,6 @@ export function ForecastPage() {
     const dates = chartDays.map((d) => d.date);
     const minIndex = chartDays.reduce((best, d, i) => (d.balance < (chartDays[best]?.balance ?? Number.POSITIVE_INFINITY) ? i : best), 0);
     return {
-      animationDuration: 500,
       grid: { left: 50, right: 18, top: 26, bottom: 30 },
       tooltip: {
         trigger: 'axis',
@@ -146,9 +145,11 @@ export function ForecastPage() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label={`${horizon} 天后余额`} value={<Money cents={end} />} hint="按当前计划与消费模型推算" tone={end < 0 ? 'danger' : 'default'} />
-        <StatCard label="预测期最低余额" value={<Money cents={risk.minBalance} />} hint={`${formatCN(risk.minBalanceDate)} · 最低可用 ${formatMoneyShort(risk.minFree)}`} tone={level === 'danger' ? 'danger' : level === 'warning' ? 'amber' : 'teal'} />
+        <StatCard key={horizon} className="balance-pulse" label={`${horizon} 天后余额`} value={<Money cents={end} />} hint="按当前计划与消费模型推算" tone={end < 0 ? 'danger' : 'default'} />
+        <StatCard key={horizon} className="balance-pulse" label="预测期最低余额" value={<Money cents={risk.minBalance} />} hint={`${formatCN(risk.minBalanceDate)} · 最低可用 ${formatMoneyShort(risk.minFree)}`} tone={level === 'danger' ? 'danger' : level === 'warning' ? 'amber' : 'teal'} />
         <StatCard
+          key={horizon}
+          className="balance-pulse"
           label="现金流状态"
           value={<span className="text-[18px]">{riskText(level)}</span>}
           hint={
@@ -158,11 +159,21 @@ export function ForecastPage() {
           }
           tone={level === 'danger' ? 'danger' : level === 'warning' ? 'amber' : 'default'}
         />
-        <StatCard label="目标预留合计" value={<Money cents={forecast.baseReserved} />} hint="可用 = 余额 − 预留 − 安全储备" />
+        <StatCard key={horizon} className="balance-pulse" label="目标预留合计" value={<Money cents={forecast.baseReserved} />} hint="可用 = 余额 − 预留 − 安全储备" />
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.55fr_1fr]">
-        <Card title={`未来 ${horizon} 天余额曲线`} subtitle="红线标记预测期最低点；悬停可看每日收入、固定支出与可变估计。" action={<Badge tone="white">{forecast.model.trainingDayCount} 个训练日</Badge>}>
+        <Card
+          className="rise"
+          style={{ '--i': 0 } as CSSProperties}
+          title={`未来 ${horizon} 天余额曲线`}
+          subtitle="红线标记预测期最低点；悬停可看每日收入、固定支出与可变估计。"
+          action={
+            <span key={forecast.model.trainingDayCount} className="balance-pulse inline-flex">
+              <Badge tone="white">{forecast.model.trainingDayCount} 个训练日</Badge>
+            </span>
+          }
+        >
           <EChart option={option} height={330} ariaLabel="未来余额预测曲线" />
           {forecast.coverageRisks.length > 0 && (
             <div className="mt-2 space-y-1 rounded-lg border border-[#EEDCB9] bg-[#FBF4E4] px-3 py-2 text-[11px] leading-relaxed text-[#7A5517]">
@@ -177,7 +188,7 @@ export function ForecastPage() {
         </Card>
 
         <div className="space-y-4">
-          <Card title="今日待付 / 待收" subtitle="逾期支出按今日计入；逾期收入不默认到账" action={<Link to="/schedules" className="text-[11.5px] font-semibold text-[#0B6357] hover:underline">处理</Link>}>
+          <Card className="rise" style={{ '--i': 1 } as CSSProperties} title="今日待付 / 待收" subtitle="逾期支出按今日计入；逾期收入不默认到账" action={<Link to="/schedules" className="text-[11.5px] font-semibold text-[#0B6357] hover:underline">处理</Link>}>
             {todayItems.length === 0 ? (
               <p className="text-[12px] text-[#8A887F]">今天没有待处理的固定计划。</p>
             ) : (
@@ -195,13 +206,13 @@ export function ForecastPage() {
             )}
           </Card>
 
-          <Card title="可变消费模型" subtitle="最近 6 周；每个星期几至少 3 个样本才用中位数">
+          <Card className="rise" style={{ '--i': 2 } as CSSProperties} title="可变消费模型" subtitle="最近 6 周；每个星期几至少 3 个样本才用中位数">
             <div className="grid grid-cols-7 gap-1">
-              {[1, 2, 3, 4, 5, 6, 0].map((w) => {
+              {[1, 2, 3, 4, 5, 6, 0].map((w, i) => {
                 const stat = forecast.model.weekdayStats[w];
                 const bias = dataset.settings.calibration.weekdayBias[w] ?? 0;
                 return (
-                  <div key={w} className="rounded-lg bg-[#FAF8F3] px-1 py-2 text-center">
+                  <div key={w} className="rise rounded-lg bg-[#FAF8F3] px-1 py-2 text-center" style={{ '--d': `${i * 20}ms` } as CSSProperties}>
                     <p className="text-[10px] text-[#8A887F]">{weekdayCN(w)}</p>
                     <p className="num mt-1 text-[11px] font-semibold">{stat?.median === null || stat?.median === undefined ? '—' : formatMoneyShort(stat.median)}</p>
                     <p className="mt-0.5 text-[9.5px] text-[#A3A097]">{stat?.samples ?? 0} 样本</p>
@@ -222,8 +233,8 @@ export function ForecastPage() {
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-        <Card title="未来 14 天明细" subtitle="日终净额与可变估计来源" padded={false}>
-          <div className="table-wrap">
+        <Card className="rise" style={{ '--i': 0 } as CSSProperties} title="未来 14 天明细" subtitle="日终净额与可变估计来源" padded={false}>
+          <div key={`detail-${horizon}`} className="table-wrap fade-swap">
             <table className="data">
               <thead><tr><th>日期</th><th className="text-right">收入</th><th className="text-right">固定支出</th><th className="text-right">可变估计</th><th className="text-right">日终余额</th></tr></thead>
               <tbody>
@@ -241,7 +252,7 @@ export function ForecastPage() {
           </div>
         </Card>
 
-        <Card title="预测假设与限制" subtitle="这些文字会随当前数据变化">
+        <Card className="rise" style={{ '--i': 1 } as CSSProperties} title="预测假设与限制" subtitle="这些文字会随当前数据变化">
           <ul className="space-y-2">
             {forecast.assumptions.map((a) => (
               <li key={a} className="flex items-start gap-2 text-[11.5px] leading-relaxed text-[#6B6A63]">

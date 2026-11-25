@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -30,7 +30,7 @@ import { runForecast } from '../domain/forecasting/engine';
 import { buildOccurrenceViews } from '../domain/occurrences';
 import { formatMoneyShort } from '../domain/money';
 import { EChart } from '../components/Chart';
-import { Badge, Button, Card, EmptyState, Money, Progress, StatCard, cn } from '../components/ui';
+import { Badge, Button, Card, EmptyState, AnimatedMoney, Money, Progress, StatCard, cn } from '../components/ui';
 import { dueLabel, monthLabel, riskText } from '../lib/ui';
 
 const FEATURES = [
@@ -84,7 +84,6 @@ export function DashboardPage() {
   const option = useMemo<EChartsOption>(() => {
     const dates = chartDays.map((d) => d.date);
     return {
-      animationDuration: 500,
       grid: { left: 46, right: 14, top: 18, bottom: 28 },
       tooltip: {
         trigger: 'axis',
@@ -247,16 +246,16 @@ export function DashboardPage() {
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="总余额" value={<Money cents={summary.balance} />} hint={`${dataset.accounts.length} 个账户合计`} />
+            <StatCard label="总余额" value={<AnimatedMoney id="stat.balance" cents={summary.balance} />} hint={`${dataset.accounts.length} 个账户合计`} />
             <StatCard
               label="可用可支配"
-              value={<Money cents={summary.free} />}
+              value={<AnimatedMoney id="stat.free" cents={summary.free} />}
               hint={`已扣目标预留 ${formatMoneyShort(summary.reserved)} 与安全储备`}
               tone={summary.free < 0 ? 'danger' : 'teal'}
             />
             <StatCard
               label={`${monthLabel(month)}结余`}
-              value={<Money cents={summary.monthStats.net} />}
+              value={<AnimatedMoney id="stat.net" cents={summary.monthStats.net} />}
               hint={
                 <span className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-0.5 text-[#0B6357]"><TrendingUp size={12} />{formatMoneyShort(summary.monthStats.income)}</span>
@@ -285,7 +284,7 @@ export function DashboardPage() {
           </div>
 
           {(riskLevel !== 'safe' || forecast.coverageRisks.length > 0) && (
-            <div className="mt-3 flex flex-col gap-2 rounded-xl border border-[#EEDCB9] bg-[#FBF4E4] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="rise mt-3 flex flex-col gap-2 rounded-xl border border-[#EEDCB9] bg-[#FBF4E4] px-4 py-3 sm:flex-row sm:items-center sm:justify-between" style={{ '--d': '40ms' } as CSSProperties}>
               <div className="flex items-start gap-2 text-[12.5px] leading-relaxed text-[#7A5517]">
                 <CalendarClock size={16} className="mt-0.5 shrink-0" />
                 <span>
@@ -310,6 +309,8 @@ export function DashboardPage() {
 
             <div className="grid gap-4">
               <Card
+                className="rise"
+                style={{ '--i': 0 } as CSSProperties}
                 title="今日待办"
                 subtitle="逾期支出会按今日待付保守计入预测"
                 action={summary.tasks.length > 0 ? <Badge tone="amber">{summary.tasks.length} 项</Badge> : <Badge tone="teal">已清</Badge>}
@@ -343,7 +344,7 @@ export function DashboardPage() {
                 )}
               </Card>
 
-              <Card title="接下来" subtitle="未来 30 天的固定计划" action={<Button size="xs" variant="ghost" onClick={() => navigate('/schedules')}>全部 <ArrowRight size={13} /></Button>}>
+              <Card className="rise" style={{ '--i': 1 } as CSSProperties} title="接下来" subtitle="未来 30 天的固定计划" action={<Button size="xs" variant="ghost" onClick={() => navigate('/schedules')}>全部 <ArrowRight size={13} /></Button>}>
                 {summary.upcoming.length === 0 ? (
                   <p className="text-[12px] text-[#8A887F]">未来 30 天没有固定计划。</p>
                 ) : (
@@ -370,6 +371,8 @@ export function DashboardPage() {
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <Card
+              className="rise"
+              style={{ '--i': 0 } as CSSProperties}
               title="目标进度"
               subtitle="目标预留是可自由支配金额的 earmark，不改变账户余额"
               action={<Link to="/goals" className="text-[12px] font-semibold text-[#0B6357] hover:underline">管理目标</Link>}
@@ -397,7 +400,7 @@ export function DashboardPage() {
               )}
             </Card>
 
-            <Card title="账户" subtitle="转账会在账户间同时记一笔，不改变总余额">
+            <Card className="rise" style={{ '--i': 1 } as CSSProperties} title="账户" subtitle="转账会在账户间同时记一笔，不改变总余额">
               <ul className="space-y-3">
                 {dataset.accounts.filter((a) => !a.archived).map((account) => {
                   const balance = totalBalanceAt([account], dataset.transactions, today);

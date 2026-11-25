@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { ArrowRight, ShieldCheck, Sparkles, Wallet } from 'lucide-react';
 import { parseMoneyInput } from '../domain/money';
 import { todayISO } from '../domain/days';
@@ -46,19 +46,19 @@ export function Onboarding() {
     <div className="min-h-screen px-4 py-8 sm:px-6 sm:py-14">
       <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <div className="pt-2">
-          <div className="flex items-center gap-3">
+          <div className="rise flex items-center gap-3">
             <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#0E7568] text-[22px] font-bold text-white">¥</div>
             <div>
               <p className="text-[22px] font-semibold tracking-tight">MoneyFlow 钱流</p>
               <p className="text-[11.5px] tracking-[0.16em] text-[#8A887F]">看清现金流向，再做消费决定</p>
             </div>
           </div>
-          <h1 className="mt-9 text-[30px] font-semibold leading-[1.2] tracking-[-0.02em] sm:text-[36px]">
+          <h1 className="rise mt-9 text-[30px] font-semibold leading-[1.2] tracking-[-0.02em] sm:text-[36px]" style={{ '--d': '28ms' } as CSSProperties}>
             不猜、不夸大，
             <br />
             用可解释的模型看未来 90 天。
           </h1>
-          <p className="mt-4 max-w-xl text-[13.5px] leading-relaxed text-[#6B6A63]">
+          <p className="rise mt-4 max-w-xl text-[13.5px] leading-relaxed text-[#6B6A63]" style={{ '--d': '56ms' } as CSSProperties}>
             MoneyFlow 把真实流水、固定计划、目标预留放进同一本账，给出可追溯的余额预测与可执行的储蓄建议。所有数据仅保存在本机浏览器。
           </p>
           <ul className="mt-6 space-y-3.5">
@@ -66,8 +66,8 @@ export function Onboarding() {
               { icon: ShieldCheck, title: '本地优先，不上传账单', desc: '使用浏览器 IndexedDB 存储；导出备份由你控制。' },
               { icon: Wallet, title: '整数分记账，余额守恒', desc: '收入、支出、转账与目标预留分开建模，不出现浮点误差。' },
               { icon: Sparkles, title: '预测标注假设与来源', desc: '历史不足时明确「未估计」；校准与回测结果如实展示。' },
-            ].map((item) => (
-              <li key={item.title} className="flex gap-3">
+            ].map((item, i) => (
+              <li key={item.title} className="rise flex gap-3" style={{ '--i': i } as CSSProperties}>
                 <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#E3F1ED] text-[#0B6357]">
                   <item.icon size={16} />
                 </div>
@@ -80,7 +80,7 @@ export function Onboarding() {
           </ul>
         </div>
 
-        <div className="card h-fit p-5 sm:p-6">
+        <div className="card rise h-fit p-5 sm:p-6" style={{ '--d': '120ms' } as CSSProperties}>
           <p className="text-[15px] font-semibold">建立你的账本</p>
           <p className="mt-1 text-[12px] leading-relaxed text-[#6B6A63]">三步就能开始；之后可在设置里修改。</p>
           <div className="mt-5 space-y-3.5">

@@ -1,4 +1,4 @@
-import { useEffect, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react';
 import {
   ArrowLeftRight,
   Book,
@@ -59,6 +59,7 @@ export function Card({
   action,
   children,
   className,
+  style,
   padded = true,
 }: {
   title?: ReactNode;
@@ -66,10 +67,11 @@ export function Card({
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  style?: CSSProperties;
   padded?: boolean;
 }) {
   return (
-    <section className={cn('card', className)}>
+    <section className={cn('card', className)} style={style}>
       {(title || action) && (
         <header className="flex items-start justify-between gap-3 px-5 pt-5">
           <div>
@@ -88,7 +90,7 @@ export function PageHeader({ title, description, actions }: { title: string; des
   return (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h1 className="text-[26px] font-semibold tracking-[-0.02em] text-[#1F2421]">{title}</h1>
+        <h1 className="page-title text-[26px] font-semibold tracking-[-0.02em] text-[#1F2421]">{title}</h1>
         {description && <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-[#6B6A63]">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -98,6 +100,71 @@ export function PageHeader({ title, description, actions }: { title: string; des
 
 export function Money({ cents, className, short = false }: { cents: number; className?: string; short?: boolean }) {
   return <span className={cn('num', cents < 0 && 'text-[#B5453C]', className)}>{short ? formatMoneyShort(cents) : formatMoney(cents)}</span>;
+}
+
+/** 同一 id 的余额在页面重新挂载后仍从上次显示值逐位翻转（首次出现直接显示）。 */
+const lastMoney = new Map<string, number>();
+
+/** 余额数字逐位翻转（加油机式滚动），数值变化瞬间闪一下。 */
+export function AnimatedMoney({ cents, id, className }: { cents: number; id?: string; className?: string }) {
+  const [prev, setPrev] = useState<string>(() => {
+    const old = id === undefined ? undefined : lastMoney.get(id);
+    return old === undefined || old === cents ? formatMoney(cents) : formatMoney(old);
+  });
+  const [pulse, setPulse] = useState(false);
+  const prevCentsRef = useRef(cents);
+  const mountedChanged = id !== undefined && lastMoney.get(id) !== undefined && lastMoney.get(id) !== cents;
+
+  useEffect(() => {
+    if (id !== undefined) lastMoney.set(id, cents);
+  }, [id, cents]);
+
+  const text = formatMoney(cents);
+
+  useEffect(() => {
+    if (prev !== text && prev.length !== text.length) setPrev(text);
+  }, [prev, text]);
+
+  useEffect(() => {
+    const prevCents = prevCentsRef.current;
+    prevCentsRef.current = cents;
+    if (prevCents === cents) {
+      if (mountedChanged) {
+        setPulse(true);
+        const timer = setTimeout(() => setPulse(false), 700);
+        return () => clearTimeout(timer);
+      }
+      return;
+    }
+    const prevText = formatMoney(prevCents);
+    if (prevText.length === text.length) setPrev(prevText);
+    setPulse(true);
+    const timer = setTimeout(() => setPulse(false), 700);
+    return () => clearTimeout(timer);
+    // mountedChanged 只在挂载时参与判断
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cents]);
+
+  const canRoll = prev !== text && prev.length === text.length;
+  const base = cn('num', cents < 0 && 'text-[#B5453C]', pulse && 'balance-pulse', className);
+
+  if (!canRoll) return <span className={base}>{text}</span>;
+
+  return (
+    <span className={cn(base, 'odometer')}>
+      {text.split('').map((ch, i) => {
+        const p = prev[i];
+        if (!/[0-9]/.test(ch) || !/[0-9]/.test(p ?? '')) return <span key={i}>{ch}</span>;
+        const fromRight = text.length - 1 - i;
+        return (
+          <span key={i} className="digit-col" style={{ '--d': `${fromRight * 28}ms` } as CSSProperties}>
+            <span className="digit-roll-old">{p}</span>
+            <span className="digit-roll-new">{ch}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
 }
 
 export function Badge({ tone = 'gray', children }: { tone?: 'teal' | 'amber' | 'danger' | 'gray' | 'white'; children: ReactNode }) {
@@ -176,7 +243,7 @@ export function Modal({
 
 export function EmptyState({ title, description, action }: { title: string; description?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[#DDD8CD] bg-[#FCFBF7] px-6 py-10 text-center">
+    <div className="fade-in flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[#DDD8CD] bg-[#FCFBF7] px-6 py-10 text-center">
       <p className="text-sm font-semibold text-[#3A3D37]">{title}</p>
       {description && <p className="max-w-md text-xs leading-relaxed text-[#7A786F]">{description}</p>}
       {action && <div className="mt-2">{action}</div>}
@@ -212,6 +279,22 @@ export function Segmented<T extends string>({
         </button>
       ))}
     </div>
+  );
+}
+
+export function Switch({
+  checked,
+  onChange,
+  'aria-label': ariaLabel,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  'aria-label'?: string;
+}) {
+  return (
+    <button type="button" role="switch" aria-checked={checked} aria-label={ariaLabel} className="switch" onClick={() => onChange(!checked)}>
+      <span className="switch-knob" />
+    </button>
   );
 }
 
@@ -251,6 +334,36 @@ export function CategoryIcon({ icon, className }: { icon: string; className?: st
   return <Icon size={15} className={className} />;
 }
 
+function hashStr(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i += 1) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function burstCoins(seed: string) {
+  const h = hashStr(seed);
+  const rand = (n: number) => {
+    let x = (h + Math.imul(n, 2654435761)) >>> 0;
+    x = Math.imul(x ^ (x >>> 15), 2246822519) >>> 0;
+    x = Math.imul(x ^ (x >>> 13), 3266489917) >>> 0;
+    return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+  };
+  return Array.from({ length: 10 }, (_, i) => {
+    const side = i % 2 === 0 ? 1 : -1;
+    return {
+      dx: Math.round(side * (30 + rand(i) * 80)),
+      dy: Math.round(36 + rand(i + 99) * 44),
+      rot: Math.round(side * (120 + rand(i + 55) * 320)),
+      delay: Math.round(rand(i + 7) * 90),
+      size: Math.round(10 + rand(i + 33) * 5),
+      teal: rand(i + 21) < 0.3,
+    };
+  });
+}
+
 export function Toast() {
   const toast = useAppStore((s) => s.toast);
   const clear = useAppStore((s) => s.clearToast);
@@ -258,16 +371,30 @@ export function Toast() {
   const Icon = toast.kind === 'success' ? CheckCircle2 : toast.kind === 'error' ? XCircle : Info;
   return (
     <div className="fixed inset-x-0 bottom-20 z-[60] flex justify-center px-4 sm:bottom-6">
+      {toast.kind === 'success' && (
+        <div key={`burst-${toast.id}`} className="toast-burst" aria-hidden="true">
+          {burstCoins(String(toast.id)).map((p, i) => (
+            <span
+              key={i}
+              className={cn('burst-coin', p.teal && 'burst-coin-teal')}
+              style={{ '--dx': `${p.dx}px`, '--dy': `${p.dy}px`, '--rot': `${p.rot}deg`, '--delay': `${p.delay}ms`, '--size': `${p.size}px` } as CSSProperties}
+            >
+              ¥
+            </span>
+          ))}
+        </div>
+      )}
       <div
+        key={toast.id}
         className={cn(
-          'flex max-w-md items-start gap-2 rounded-xl border px-4 py-3 text-[13px] shadow-xl',
+          'toast-pop flex max-w-md items-start gap-2 rounded-xl border px-4 py-3 text-[13px] shadow-xl',
           toast.kind === 'success' && 'border-[#CBE5DD] bg-[#F1FAF7] text-[#0B6357]',
           toast.kind === 'error' && 'border-[#EBCBC6] bg-[#FCF1EF] text-[#98362E]',
           toast.kind === 'info' && 'border-[#E4E0D8] bg-white text-[#3A3D37]',
         )}
         role="status"
       >
-        <Icon size={16} className="mt-0.5 shrink-0" />
+        <Icon size={16} className={cn('mt-0.5 shrink-0', toast.kind === 'success' && 'toast-check')} />
         <span className="leading-relaxed">{toast.text}</span>
         <button type="button" className="ml-1 opacity-60 hover:opacity-100" onClick={clear} aria-label="关闭提示">
           <X size={14} />
@@ -291,14 +418,16 @@ export function StatCard({
   value,
   hint,
   tone = 'default',
+  className,
 }: {
   label: string;
   value: ReactNode;
   hint?: ReactNode;
   tone?: 'default' | 'teal' | 'amber' | 'danger';
+  className?: string;
 }) {
   return (
-    <div className="card p-4 sm:p-5">
+    <div className={cn('card stat-in p-4 sm:p-5', className)}>
       <p className="text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[#8A887F]">{label}</p>
       <div
         className={cn(

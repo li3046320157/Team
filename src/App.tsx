@@ -1,4 +1,4 @@
-import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { AppShell } from './components/AppShell';
 import { AuthPage } from './components/AuthPage';
@@ -15,6 +15,53 @@ import { GoalsPage } from './pages/Goals';
 import { DataCenterPage } from './pages/DataCenter';
 import { SettingsPage } from './pages/Settings';
 import { AssistantPage } from './pages/Assistant';
+
+function Shell() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      const btn = target?.closest<HTMLElement>('.btn:not(:disabled)');
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      const size = Math.max(rect.width, rect.height) * 2.2;
+      const span = document.createElement('span');
+      span.className = 'ripple';
+      span.style.width = `${size}px`;
+      span.style.height = `${size}px`;
+      span.style.left = `${event.clientX - rect.left - size / 2}px`;
+      span.style.top = `${event.clientY - rect.top - size / 2}px`;
+      btn.appendChild(span);
+      window.setTimeout(() => span.remove(), 1500);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, []);
+
+  return (
+    <>
+      <AppShell>
+        <div key={location.pathname} className="page-enter">
+          <Routes>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/ledger" element={<LedgerPage />} />
+            <Route path="/schedules" element={<SchedulesPage />} />
+            <Route path="/insights" element={<InsightsPage />} />
+            <Route path="/forecast" element={<ForecastPage />} />
+            <Route path="/assistant" element={<AssistantPage />} />
+            <Route path="/sandbox" element={<SandboxPage />} />
+            <Route path="/goals" element={<GoalsPage />} />
+            <Route path="/data" element={<DataCenterPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
+      </AppShell>
+      <Toast />
+    </>
+  );
+}
 
 export function App() {
   const boot = useAppStore((s) => s.boot);
@@ -96,22 +143,7 @@ export function App() {
 
   return (
     <HashRouter>
-      <AppShell>
-        <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/ledger" element={<LedgerPage />} />
-          <Route path="/schedules" element={<SchedulesPage />} />
-          <Route path="/insights" element={<InsightsPage />} />
-          <Route path="/forecast" element={<ForecastPage />} />
-          <Route path="/assistant" element={<AssistantPage />} />
-          <Route path="/sandbox" element={<SandboxPage />} />
-          <Route path="/goals" element={<GoalsPage />} />
-          <Route path="/data" element={<DataCenterPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AppShell>
-      <Toast />
+      <Shell />
     </HashRouter>
   );
 }

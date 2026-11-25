@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { detectRecurringCandidates } from '../../src/domain/insights/recurring';
 import { detectAnomalies } from '../../src/domain/insights/anomaly';
 import { detectSmallSpending } from '../../src/domain/insights/small';
-import { makeCategory, makeFlow, makeSettings, makeTxn } from './fixtures';
+import { setCandidateStatus } from '../../src/services/mutations';
+import { makeCategory, makeDataset, makeFlow, makeSettings, makeTxn } from './fixtures';
 
 const baseSettings = makeSettings();
 
@@ -86,6 +87,85 @@ describe('周期支出识别', () => {
     );
     detectRecurringCandidates({ transactions: txns, asOfDate: '2026-04-01', settings: baseSettings, flows: flows as never[], previous: [] });
     expect(flows).toHaveLength(0);
+  });
+});
+
+describe('候选状态持久化', () => {
+  const monthlyTxns = ['2026-01-15', '2026-02-15', '2026-03-15'].map((date, i) =>
+    makeTxn({ id: `p${i}`, date, amount: 1500, merchant: '网易云音乐' }),
+  );
+
+  it('忽略检测出的新候选后，重新检测不再列为待确认', () => {
+    let dataset = makeDataset({ transactions: monthlyTxns });
+    const detected = detectRecurringCandidates({
+      transactions: dataset.transactions,
+      asOfDate: '2026-04-01',
+      settings: dataset.settings,
+      flows: [],
+      previous: dataset.candidates,
+    });
+    expect(detected).toHaveLength(1);
+
+    dataset = setCandidateStatus(dataset, detected[0], 'ignored');
+
+    const redetected = detectRecurringCandidates({
+      transactions: dataset.transactions,
+      asOfDate: '2026-04-01',
+      settings: dataset.settings,
+      flows: [],
+      previous: dataset.candidates,
+    });
+    expect(redetected.filter((c) => c.status === 'open')).toHaveLength(0);
+    expect(redetected.some((c) => c.status === 'ignored')).toBe(true);
+  });
+
+  it('候选已在列表中时只更新状态并保留其他字段', () => {
+    const stored = {
+      id: 'cand_old',
+      signature: 'wangyiyun|month',
+      merchantKey: 'wangyiyun',
+      merchantLabel: '网易云音乐',
+      unit: 'month' as const,
+      interval: 1,
+      estimatedAmount: 1500,
+      lastDate: '2026-03-15',
+      nextDate: '2026-04-15',
+      score: 0.87,
+      scoreParts: { interval: 1, amount: 1, sample: 0.33 },
+      sampleIds: ['p0', 'p1', 'p2'],
+      intervalDays: 30,
+      amountCv: 0,
+      status: 'open' as const,
+      flowId: 'flow_x',
+    };
+    const dataset = makeDataset({ candidates: [stored] });
+    const next = setCandidateStatus(dataset, { ...stored, nextDate: '2026-05-15' }, 'ignored');
+    expect(next.candidates).toHaveLength(1);
+    expect(next.candidates[0]).toMatchObject({ status: 'ignored', flowId: 'flow_x', nextDate: '2026-05-15' });
+  });
+
+  it('同签名不同 id 的存量候选也能被匹配忽略', () => {
+    const stored = {
+      id: 'cand_legacy',
+      signature: 'wangyiyun|month',
+      merchantKey: 'wangyiyun',
+      merchantLabel: '网易云音乐',
+      unit: 'month' as const,
+      interval: 1,
+      estimatedAmount: 1500,
+      lastDate: '2026-03-15',
+      nextDate: '2026-04-15',
+      score: 0.87,
+      scoreParts: { interval: 1, amount: 1, sample: 0.33 },
+      sampleIds: ['p0', 'p1', 'p2'],
+      intervalDays: 30,
+      amountCv: 0,
+      status: 'open' as const,
+    };
+    const dataset = makeDataset({ candidates: [stored] });
+    const next = setCandidateStatus(dataset, { ...stored, id: 'cand_wangyiyun|month' }, 'ignored');
+    expect(next.candidates).toHaveLength(1);
+    expect(next.candidates[0].status).toBe('ignored');
   });
 });
 

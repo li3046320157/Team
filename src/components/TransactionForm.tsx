@@ -124,11 +124,13 @@ export function TransactionForm({
               ]}
             />
             {kind !== 'transfer' && (
-              <select className="select !w-auto !py-1.5 text-xs" value={nature} onChange={(e) => setNature(e.target.value as TxnNature)} aria-label="支出性质">
-                <option value="variable">可变消费</option>
-                <option value="recurring">固定重复</option>
-                <option value="one_off">一次性</option>
-              </select>
+              <span key={`kind-${kind}-nature`} className="fade-swap">
+                <select className="select !w-auto !py-1.5 text-xs" value={nature} onChange={(e) => setNature(e.target.value as TxnNature)} aria-label="支出性质">
+                  <option value="variable">可变消费</option>
+                  <option value="recurring">固定重复</option>
+                  <option value="one_off">一次性</option>
+                </select>
+              </span>
             )}
           </div>
 
@@ -151,28 +153,30 @@ export function TransactionForm({
                 ))}
               </select>
             </Field>
-            {kind === 'transfer' ? (
-              <Field label="转入账户">
-                <select className="select" value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
-                  {dataset.accounts.filter((a) => !a.archived).map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            ) : (
-              <Field label="分类">
-                <select className="select" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                  <option value="">请选择</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            )}
+            <span key={`kind-${kind}-field`} className="fade-swap">
+              {kind === 'transfer' ? (
+                <Field label="转入账户">
+                  <select className="select" value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
+                    {dataset.accounts.filter((a) => !a.archived).map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : (
+                <Field label="分类">
+                  <select className="select" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+                    <option value="">请选择</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+            </span>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

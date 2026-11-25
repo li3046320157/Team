@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   ArrowLeftRight,
@@ -52,6 +52,28 @@ export function LedgerPage() {
   const [deleting, setDeleting] = useState<Transaction | null>(null);
   const [quickText, setQuickText] = useState('');
   const quickRef = useRef<HTMLTextAreaElement | null>(null);
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
+  const addedTimer = useRef<number | null>(null);
+
+  const markAdded = (id: string) => {
+    setJustAddedId(id);
+    if (addedTimer.current !== null) window.clearTimeout(addedTimer.current);
+    addedTimer.current = window.setTimeout(() => {
+      setJustAddedId((cur) => (cur === id ? null : cur));
+      addedTimer.current = null;
+    }, 1200);
+  };
+
+  const addWithHighlight = (input: TxnInput, message: string) =>
+    apply((d) => {
+      const next = addTransaction(d, input);
+      if (next.transactions.length > d.transactions.length) {
+        const prev = new Set(d.transactions.map((t) => t.id));
+        const added = next.transactions.find((t) => !prev.has(t.id));
+        if (added) markAdded(added.id);
+      }
+      return next;
+    }, message);
 
   useEffect(() => {
     if (params.get('quick') === '1') {
@@ -97,6 +119,7 @@ export function LedgerPage() {
 
   const stats = useMemo(() => monthIncomeExpense(dataset.transactions, month), [dataset.transactions, month]);
   const quick = useMemo(() => (quickText.trim() ? parseQuickEntry(quickText, today) : null), [quickText, today]);
+  const listKey = `${month}|${kind}|${categoryId}`;
 
   const quickCategory = quick?.categoryHint
     ? dataset.categories.find((c) => c.name === quick.categoryHint && c.kind === quick.kind)
@@ -118,7 +141,7 @@ export function LedgerPage() {
       notify('未匹配到分类，请用表单选择分类后再保存', 'error');
       return;
     }
-    const ok = await apply((d) => addTransaction(d, input), '已按解析结果记一笔');
+    const ok = await addWithHighlight(input, '已按解析结果记一笔');
     if (ok) setQuickText('');
   };
 
@@ -127,7 +150,7 @@ export function LedgerPage() {
       const ok = await apply((d) => updateTransaction(d, editing.id, input), '流水已更新');
       return ok;
     }
-    const ok = await apply((d) => addTransaction(d, input), '已记一笔');
+    const ok = await addWithHighlight(input, '已记一笔');
     return ok;
   };
 
@@ -236,11 +259,11 @@ export function LedgerPage() {
                 />
               </div>
             ) : (
-              <div className="divide-y divide-[#F0EDE6]">
-                {grouped.map(([date, txns]) => {
+              <div key={listKey} className="divide-y divide-[#F0EDE6]">
+                {grouped.map(([date, txns], dayIndex) => {
                   const dayNet = txns.reduce((sum, t) => sum + (t.kind === 'income' ? t.amount : t.kind === 'expense' ? -t.amount : 0), 0);
                   return (
-                    <div key={date} className="px-4 py-3">
+                    <div key={date} className="ledger-day px-4 py-3" style={{ '--stagger': Math.min(dayIndex, 10) } as CSSProperties}>
                       <div className="mb-2 flex items-center justify-between">
                         <p className="text-[11.5px] font-semibold text-[#6B6A63]">{formatCN(date)}</p>
                         <span className={cn('num text-[10.5px]', dayNet >= 0 ? 'text-[#0B6357]' : 'text-[#98362E]')}>
@@ -251,8 +274,8 @@ export function LedgerPage() {
                         {txns.map((t) => {
                           const cat = t.categoryId ? categoryById.get(t.categoryId) : undefined;
                           return (
-                            <li key={t.id} className="group flex items-center gap-2.5 rounded-lg px-1 py-1.5 hover:bg-[#FAF8F3]">
-                              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#F4F1EA] text-[#6B6A63]">
+                            <li key={t.id} className={cn('ledger-row group flex items-center gap-2.5 rounded-lg px-1 py-1.5 hover:bg-[#FAF8F3]', t.id === justAddedId && 'hl-fade')}>
+                              <span className="row-icon grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#F4F1EA] text-[#6B6A63]">
                                 {t.kind === 'transfer' ? <ArrowLeftRight size={14} /> : <CategoryIcon icon={cat?.icon ?? 'shapes'} />}
                               </span>
                               <div className="min-w-0 flex-1">

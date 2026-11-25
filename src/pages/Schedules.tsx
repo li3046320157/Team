@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   CalendarClock,
   Check,
@@ -188,6 +188,25 @@ export function SchedulesPage() {
   const [settling, setSettling] = useState<OccurrenceView | null>(null);
   const [skipView, setSkipView] = useState<OccurrenceView | null>(null);
   const [rescheduling, setRescheduling] = useState<OccurrenceView | null>(null);
+  const [leavingIds, setLeavingIds] = useState<ReadonlySet<string>>(new Set());
+  const [justHandledId, setJustHandledId] = useState<string | null>(null);
+  const handledTimer = useRef<number | null>(null);
+
+  const markLeaving = (id: string) => setLeavingIds((prev) => new Set(prev).add(id));
+  const unmarkLeaving = (id: string) =>
+    setLeavingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  const markHandled = (id: string) => {
+    setJustHandledId(id);
+    if (handledTimer.current !== null) window.clearTimeout(handledTimer.current);
+    handledTimer.current = window.setTimeout(() => {
+      setJustHandledId((cur) => (cur === id ? null : cur));
+      handledTimer.current = null;
+    }, 1200);
+  };
 
   const views = useMemo(
     () => buildOccurrenceViews(dataset.flows, dataset.occurrenceRecords, addDaysISO(today, -120), addDaysISO(today, 60), today),
@@ -213,8 +232,13 @@ export function SchedulesPage() {
 
   const processSkip = async () => {
     if (!skipView) return;
-    const ok = await apply((d) => skipOccurrence(d, skipView), '本期已跳过，不计入流水');
-    if (ok) setSkipView(null);
+    const view = skipView;
+    setSkipView(null);
+    markLeaving(view.id);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const ok = await apply((d) => skipOccurrence(d, view), '本期已跳过，不计入流水');
+    if (ok) markHandled(view.id);
+    else unmarkLeaving(view.id);
   };
 
   return (
@@ -228,9 +252,15 @@ export function SchedulesPage() {
       <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
         <div className="space-y-4">
           <Card
+            className="rise"
+            style={{ '--d': '0ms' } as CSSProperties}
             title="待处理"
             subtitle="核销会按今天日期生成真实流水；也可跳过或改期"
-            action={<Badge tone={todo.length > 0 ? 'amber' : 'teal'}>{todo.length} 项到期或逾期</Badge>}
+            action={
+              <span key={todo.length} className="balance-pulse inline-flex">
+                <Badge tone={todo.length > 0 ? 'amber' : 'teal'}>{todo.length} 项到期或逾期</Badge>
+              </span>
+            }
           >
             {todo.length === 0 ? (
               <div className="flex items-center gap-2 rounded-lg bg-[#F1FAF7] px-3 py-3 text-[12.5px] text-[#0B6357]">
@@ -238,8 +268,16 @@ export function SchedulesPage() {
               </div>
             ) : (
               <ul className="space-y-2">
-                {todo.map((view) => (
-                  <li key={view.id} className={cn('flex flex-col gap-2 rounded-xl border px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between', view.overdue ? 'border-[#EBCBC6] bg-[#FCF5F3]' : 'border-[#EEDCB9] bg-[#FBF7EC]')}>
+                {todo.map((view, i) => (
+                  <li
+                    key={view.id}
+                    className={cn(
+                      'flex flex-col gap-2 rounded-xl border px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between',
+                      view.overdue ? 'border-[#EBCBC6] bg-[#FCF5F3]' : 'border-[#EEDCB9] bg-[#FBF7EC]',
+                      leavingIds.has(view.id) ? 'row-collapse' : 'rise',
+                    )}
+                    style={{ '--d': `${Math.min(i, 7) * 24}ms` } as CSSProperties}
+                  >
                     <div className="flex items-start gap-2.5">
                       <span className={cn('mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg', view.flow.kind === 'income' ? 'bg-[#E3F1ED] text-[#0B6357]' : 'bg-[#F8E7E4] text-[#98362E]')}>
                         {view.overdue ? <TriangleAlert size={15} /> : <Clock size={15} />}
@@ -265,7 +303,7 @@ export function SchedulesPage() {
             )}
           </Card>
 
-          <Card title="未来 60 天" subtitle="按日期排序，含今天之后的所有待发生期">
+          <Card className="rise" style={{ '--d': '60ms' } as CSSProperties} title="未来 60 天" subtitle="按日期排序，含今天之后的所有待发生期">
             {upcoming.length === 0 ? (
               <EmptyState title="未来没有待发生的计划" description="可以新建工资、房租或订阅计划。" action={<Button size="sm" variant="secondary" onClick={() => setFormOpen(true)}><Plus size={13} /> 新建计划</Button>} />
             ) : (
@@ -276,7 +314,7 @@ export function SchedulesPage() {
                   </thead>
                   <tbody>
                     {upcoming.slice(0, 20).map((view) => (
-                      <tr key={view.id}>
+                      <tr key={view.id} className={cn(leavingIds.has(view.id) && 'row-collapse')}>
                         <td className="whitespace-nowrap text-[12px]">{formatCN(view.dueDate)}<span className="ml-1 text-[10.5px] text-[#A3A097]">{dueLabel(view.daysUntilDue)}</span></td>
                         <td><p className="text-[12.5px] font-medium">{view.flow.title}</p><p className="text-[10.5px] text-[#A3A097]">{frequencyLabel(view.flow.rule.unit, view.flow.rule.interval)}</p></td>
                         <td><Badge tone={view.flow.kind === 'income' ? 'teal' : 'gray'}>{view.flow.kind === 'income' ? '收入' : '支出'}</Badge></td>
@@ -296,10 +334,17 @@ export function SchedulesPage() {
           </Card>
 
           {recent.length > 0 && (
-            <Card title="最近处理记录" subtitle="已核销或跳过的期次">
+            <Card className="rise" style={{ '--d': '120ms' } as CSSProperties} title="最近处理记录" subtitle="已核销或跳过的期次">
               <ul className="space-y-2">
-                {recent.map((view) => (
-                  <li key={view.id} className="flex items-center justify-between gap-3 text-[12px]">
+                {recent.map((view, i) => (
+                  <li
+                    key={view.id}
+                    className={cn(
+                      'flex items-center justify-between gap-3 text-[12px]',
+                      view.id === justHandledId ? 'hl-fade' : 'rise',
+                    )}
+                    style={{ '--d': `${Math.min(i, 7) * 24}ms` } as CSSProperties}
+                  >
                     <span className="flex items-center gap-2">
                       <span className={cn('grid h-6 w-6 place-items-center rounded-md', view.status === 'settled' ? 'bg-[#E3F1ED] text-[#0B6357]' : 'bg-[#F0EDE6] text-[#8A887F]')}>
                         {view.status === 'settled' ? <Check size={12} /> : <SkipForward size={12} />}
@@ -320,16 +365,20 @@ export function SchedulesPage() {
               <EmptyState title="还没有固定计划" description="把工资、房租等重复收支建成计划，预测才会更准。" />
             ) : (
               <ul className="space-y-2.5">
-                {dataset.flows.map((flow) => {
+                {dataset.flows.map((flow, i) => {
                   const next = pending.find((v) => v.flow.id === flow.id);
                   return (
-                    <li key={flow.id} className="group rounded-xl border border-[#EFECE6] px-3 py-2.5">
+                    <li key={flow.id} className="rise group rounded-xl border border-[#EFECE6] px-3 py-2.5" style={{ '--d': `${Math.min(i, 7) * 24}ms` } as CSSProperties}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <p className={cn('truncate text-[13px] font-medium', !flow.enabled && 'text-[#A3A097] line-through')}>{flow.title}</p>
                             {flow.source === 'recurring_candidate' && <Badge tone="teal"><CalendarClock size={10} /> 洞察</Badge>}
-                            {!flow.enabled && <Badge tone="gray">已停用</Badge>}
+                            {!flow.enabled && (
+                              <span className="fade-swap inline-flex">
+                                <Badge tone="gray">已停用</Badge>
+                              </span>
+                            )}
                           </div>
                           <p className="mt-0.5 text-[10.5px] text-[#8A887F]">
                             {frequencyLabel(flow.rule.unit, flow.rule.interval)} · {flow.kind === 'income' ? '收入' : '支出'} · {flow.accountId === dataset.accounts[0]?.id ? dataset.accounts[0]?.name : dataset.accounts.find((a) => a.id === flow.accountId)?.name}
@@ -376,6 +425,9 @@ export function SchedulesPage() {
         view={settling}
         dataset={dataset}
         onClose={() => setSettling(null)}
+        onLeaving={markLeaving}
+        onLeavingCancelled={unmarkLeaving}
+        onHandled={markHandled}
       />
 
       <Modal
@@ -388,12 +440,26 @@ export function SchedulesPage() {
         {skipView && <p className="rounded-lg bg-[#FAF8F3] px-3 py-3 text-[12.5px]">{skipView.flow.title} · {formatCN(skipView.dueDate)} · {formatMoneyShort(skipView.amount)}</p>}
       </Modal>
 
-      <RescheduleModal view={rescheduling} onClose={() => setRescheduling(null)} />
+      <RescheduleModal view={rescheduling} onClose={() => setRescheduling(null)} onLeaving={markLeaving} onLeavingCancelled={unmarkLeaving} />
     </div>
   );
 }
 
-function SettleModal({ view, dataset, onClose }: { view: OccurrenceView | null; dataset: NonNullable<ReturnType<typeof useAppStore.getState>['dataset']>; onClose: () => void }) {
+function SettleModal({
+  view,
+  dataset,
+  onClose,
+  onLeaving,
+  onLeavingCancelled,
+  onHandled,
+}: {
+  view: OccurrenceView | null;
+  dataset: NonNullable<ReturnType<typeof useAppStore.getState>['dataset']>;
+  onClose: () => void;
+  onLeaving: (id: string) => void;
+  onLeavingCancelled: (id: string) => void;
+  onHandled: (id: string) => void;
+}) {
   const apply = useAppStore((s) => s.apply);
   const today = todayISO();
   const [amount, setAmount] = useState('');
@@ -402,6 +468,7 @@ function SettleModal({ view, dataset, onClose }: { view: OccurrenceView | null; 
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [lastId, setLastId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   if (view && lastId !== view.id) {
     setLastId(view.id);
@@ -410,18 +477,23 @@ function SettleModal({ view, dataset, onClose }: { view: OccurrenceView | null; 
     setAccountId(view.flow.accountId);
     setNote('');
     setError(null);
+    setSaving(false);
   }
 
   const submit = async () => {
-    if (!view) return;
+    if (!view || saving) return;
     const parsed = parseMoneyInput(amount);
     if (!parsed.ok) return setError(parsed.error);
+    setSaving(true);
+    onClose();
+    onLeaving(view.id);
+    await new Promise((resolve) => setTimeout(resolve, 200));
     const ok = await apply(
       (d) => settleOccurrence(d, view, { date, amount: parsed.cents, accountId, note }),
       '已核销并写入流水',
     );
-    if (ok) onClose();
-    else setError('核销失败，请刷新后重试');
+    if (ok) onHandled(view.id);
+    else onLeavingCancelled(view.id);
   };
 
   return (
@@ -430,7 +502,7 @@ function SettleModal({ view, dataset, onClose }: { view: OccurrenceView | null; 
       title="核销计划"
       subtitle="核销后按实际日期与金额生成真实流水，并从待处理中移除。"
       onClose={onClose}
-      footer={<><Button variant="ghost" onClick={onClose}>取消</Button><Button variant="primary" onClick={() => void submit()}>确认核销</Button></>}
+      footer={<><Button variant="ghost" onClick={onClose}>取消</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>确认核销</Button></>}
     >
       {view && (
         <div className="space-y-4">
@@ -457,25 +529,40 @@ function SettleModal({ view, dataset, onClose }: { view: OccurrenceView | null; 
   );
 }
 
-function RescheduleModal({ view, onClose }: { view: OccurrenceView | null; onClose: () => void }) {
+function RescheduleModal({
+  view,
+  onClose,
+  onLeaving,
+  onLeavingCancelled,
+}: {
+  view: OccurrenceView | null;
+  onClose: () => void;
+  onLeaving: (id: string) => void;
+  onLeavingCancelled: (id: string) => void;
+}) {
   const apply = useAppStore((s) => s.apply);
   const today = todayISO();
   const [date, setDate] = useState(addDaysISO(today, 1));
   const [lastId, setLastId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   if (view && lastId !== view.id) {
     setLastId(view.id);
     setDate(view.dueDate >= today ? view.dueDate : addDaysISO(today, 1));
     setError(null);
+    setSaving(false);
   }
 
   const submit = async () => {
-    if (!view) return;
+    if (!view || saving) return;
     if (!date || date < today) return setError('改期日期不能早于今天');
+    setSaving(true);
+    onClose();
+    onLeaving(view.id);
+    await new Promise((resolve) => setTimeout(resolve, 200));
     const ok = await apply((d) => rescheduleOccurrence(d, view, date), '本期已改期');
-    if (ok) onClose();
-    else setError('改期失败，请刷新后重试');
+    if (!ok) onLeavingCancelled(view.id);
   };
 
   return (

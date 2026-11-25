@@ -388,10 +388,13 @@ export function confirmCandidate(dataset: Dataset, candidate: RecurringCandidate
   };
 }
 
-export function setCandidateStatus(dataset: Dataset, candidateId: string, status: 'open' | 'ignored'): Dataset {
+export function setCandidateStatus(dataset: Dataset, candidate: RecurringCandidate, status: 'open' | 'ignored'): Dataset {
+  const exists = dataset.candidates.some((c) => c.id === candidate.id || c.signature === candidate.signature);
   return {
     ...dataset,
-    candidates: dataset.candidates.map((c) => (c.id === candidateId ? { ...c, status } : c)),
+    candidates: exists
+      ? dataset.candidates.map((c) => (c.id === candidate.id || c.signature === candidate.signature ? { ...c, ...candidate, status } : c))
+      : [...dataset.candidates, { ...candidate, status }],
   };
 }
 

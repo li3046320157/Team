@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { BadgeCheck, CalendarClock, CircleHelp, Coffee, EyeOff, Info, Repeat2, ShieldAlert, Sparkles, TrendingUp } from 'lucide-react';
 import type { RecurringCandidate } from '../domain/types';
@@ -17,6 +17,23 @@ export function InsightsPage() {
   const apply = useAppStore((s) => s.apply);
   const today = todayISO();
   const [confirming, setConfirming] = useState<RecurringCandidate | null>(null);
+  const [leavingIds, setLeavingIds] = useState<ReadonlySet<string>>(new Set());
+
+  const markLeaving = (id: string) => setLeavingIds((prev) => new Set(prev).add(id));
+  const unmarkLeaving = (id: string) =>
+    setLeavingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  const collapseApply = (id: string, action: () => Promise<boolean>) => {
+    markLeaving(id);
+    window.setTimeout(() => {
+      void action().then((ok) => {
+        if (!ok) unmarkLeaving(id);
+      });
+    }, 200);
+  };
 
   const candidates = useMemo(
     () => detectRecurringCandidates({ transactions: dataset.transactions, asOfDate: today, settings: dataset.settings, flows: dataset.flows, previous: dataset.candidates }),
@@ -52,9 +69,15 @@ export function InsightsPage() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card
+          className="rise"
+          style={{ '--i': 0 } as CSSProperties}
           title="周期支出候选"
           subtitle="同商户、金额稳定、间隔接近周/月/年；确认后才创建计划"
-          action={<Badge tone={openCandidates.length ? 'amber' : 'teal'}>{openCandidates.length} 个待确认</Badge>}
+          action={
+            <span key={openCandidates.length} className="balance-pulse inline-flex">
+              <Badge tone={openCandidates.length ? 'amber' : 'teal'}>{openCandidates.length} 个待确认</Badge>
+            </span>
+          }
         >
           {openCandidates.length === 0 ? (
             <EmptyState
@@ -63,8 +86,12 @@ export function InsightsPage() {
             />
           ) : (
             <ul className="space-y-3">
-              {openCandidates.slice(0, 6).map((c) => (
-                <li key={c.id} className="rounded-xl border border-[#EFECE6] p-3">
+              {openCandidates.slice(0, 6).map((c, i) => (
+                <li
+                  key={c.id}
+                  className={cn('rounded-xl border border-[#EFECE6] p-3', leavingIds.has(c.id) ? 'row-collapse' : 'rise')}
+                  style={{ '--d': `${Math.min(i, 7) * 24}ms` } as CSSProperties}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-2.5">
                       <span className="mt-0.5 grid h-8 w-8 place-items-center rounded-lg bg-[#E3F1ED] text-[#0B6357]"><Repeat2 size={15} /></span>
@@ -84,7 +111,7 @@ export function InsightsPage() {
                     最近一次 {formatCN(c.lastDate)} · 金额波动 {pct(c.amountCv, 1)} · 样本 {c.sampleIds.length} 笔
                   </p>
                   <div className="mt-2 flex items-center justify-end gap-2">
-                    <Button size="xs" variant="ghost" onClick={() => void apply((d) => setCandidateStatus(d, c.id, 'ignored'), '已忽略该候选')}>
+                    <Button size="xs" variant="ghost" onClick={() => collapseApply(c.id, () => apply((d) => setCandidateStatus(d, c, 'ignored'), '已忽略该候选'))}>
                       <EyeOff size={11} /> 忽略
                     </Button>
                     <Button size="xs" variant="primary" onClick={() => setConfirming(c)}>
@@ -98,9 +125,15 @@ export function InsightsPage() {
         </Card>
 
         <Card
+          className="rise"
+          style={{ '--i': 1 } as CSSProperties}
           title="异常消费"
           subtitle="MAD 稳健 Z 为主，MAD=0 时退回 IQR 或倍数规则；只用该笔之前的历史"
-          action={<Badge tone={openAnomalies.length ? 'amber' : 'teal'}>{openAnomalies.length} 条待复核</Badge>}
+          action={
+            <span key={openAnomalies.length} className="balance-pulse inline-flex">
+              <Badge tone={openAnomalies.length ? 'amber' : 'teal'}>{openAnomalies.length} 条待复核</Badge>
+            </span>
+          }
         >
           {openAnomalies.length === 0 ? (
             <EmptyState
@@ -109,8 +142,12 @@ export function InsightsPage() {
             />
           ) : (
             <ul className="space-y-3">
-              {openAnomalies.slice(0, 5).map((a) => (
-                <li key={a.txId} className="rounded-xl border border-[#EEDCB9] bg-[#FDFAF3] p-3">
+              {openAnomalies.slice(0, 5).map((a, i) => (
+                <li
+                  key={a.txId}
+                  className={cn('rounded-xl border border-[#EEDCB9] bg-[#FDFAF3] p-3', leavingIds.has(a.txId) ? 'row-collapse' : 'rise')}
+                  style={{ '--d': `${Math.min(i, 7) * 24}ms` } as CSSProperties}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-[13px] font-semibold">{a.merchant || a.categoryName || '一笔支出'}</p>
@@ -125,8 +162,8 @@ export function InsightsPage() {
                     </p>
                   </div>
                   <div className="mt-2 flex items-center justify-end gap-2">
-                    <Button size="xs" variant="ghost" onClick={() => void apply((d) => setReview(d, a.txId, 'ignored'), '已忽略该异常提醒')}>忽略</Button>
-                    <Button size="xs" variant="secondary" onClick={() => void apply((d) => setReview(d, a.txId, 'confirmed'), '已确认异常，仅做标记')}>确认异常</Button>
+                    <Button size="xs" variant="ghost" onClick={() => collapseApply(a.txId, () => apply((d) => setReview(d, a.txId, 'ignored'), '已忽略该异常提醒'))}>忽略</Button>
+                    <Button size="xs" variant="secondary" onClick={() => collapseApply(a.txId, () => apply((d) => setReview(d, a.txId, 'confirmed'), '已确认异常，仅做标记'))}>确认异常</Button>
                   </div>
                 </li>
               ))}
@@ -138,18 +175,24 @@ export function InsightsPage() {
         </Card>
 
         <Card
+          className="rise"
+          style={{ '--i': 2 } as CSSProperties}
           title="高频小额"
           subtitle={`最近 ${small.windowDays} 天，单笔不超过 ¥${(small.threshold / 100).toFixed(0)} 的消费聚合`}
-          action={<Badge tone={small.reminder ? 'amber' : 'teal'}>{small.count} 笔</Badge>}
+          action={
+            <span key={small.count} className="balance-pulse inline-flex">
+              <Badge tone={small.reminder ? 'amber' : 'teal'}>{small.count} 笔</Badge>
+            </span>
+          }
         >
           {small.count === 0 ? (
             <EmptyState title="这段时间没有小额消费" description="把阈值调低，或先记录几笔真实流水。" />
           ) : (
             <>
               <div className="grid grid-cols-3 gap-2 rounded-xl bg-[#FAF8F3] px-3 py-3 text-center">
-                <div><p className="text-[10.5px] text-[#8A887F]">合计</p><p className="num mt-1 text-[16px] font-semibold"><Money cents={small.total} /></p></div>
-                <div><p className="text-[10.5px] text-[#8A887F]">笔数</p><p className="num mt-1 text-[16px] font-semibold">{small.count}</p></div>
-                <div><p className="text-[10.5px] text-[#8A887F]">占期初</p><p className="num mt-1 text-[16px] font-semibold">{small.total >= 0 ? '' : ''}{dataset.accounts.length ? pct(small.total / Math.max(1, dataset.accounts.reduce((a, acc) => a + acc.openingBalance, 0)), 1) : '—'}</p></div>
+                <div className="rise balance-pulse" style={{ '--i': 0 } as CSSProperties}><p className="text-[10.5px] text-[#8A887F]">合计</p><p className="num mt-1 text-[16px] font-semibold"><Money cents={small.total} /></p></div>
+                <div className="rise balance-pulse" style={{ '--i': 1 } as CSSProperties}><p className="text-[10.5px] text-[#8A887F]">笔数</p><p className="num mt-1 text-[16px] font-semibold">{small.count}</p></div>
+                <div className="rise balance-pulse" style={{ '--i': 2 } as CSSProperties}><p className="text-[10.5px] text-[#8A887F]">占期初</p><p className="num mt-1 text-[16px] font-semibold">{small.total >= 0 ? '' : ''}{dataset.accounts.length ? pct(small.total / Math.max(1, dataset.accounts.reduce((a, acc) => a + acc.openingBalance, 0)), 1) : '—'}</p></div>
               </div>
               <ul className="mt-3 space-y-2">
                 {small.byMerchant.slice(0, 5).map((g) => (
@@ -168,7 +211,7 @@ export function InsightsPage() {
           )}
         </Card>
 
-        <Card title="已处理与口径" subtitle="不强行制造“洞察”">
+        <Card className="rise" style={{ '--i': 3 } as CSSProperties} title="已处理与口径" subtitle="不强行制造“洞察”">
           <div className="space-y-3 text-[11.5px] leading-relaxed text-[#6B6A63]">
             <div className="flex items-start gap-2 rounded-lg bg-[#FAF8F3] px-3 py-2.5">
               <CircleHelp size={14} className="mt-0.5 shrink-0" />
@@ -200,12 +243,27 @@ export function InsightsPage() {
         </Card>
       </div>
 
-      <ConfirmCandidateModal candidate={confirming} onClose={() => setConfirming(null)} />
+      <ConfirmCandidateModal
+        candidate={confirming}
+        onClose={() => setConfirming(null)}
+        onLeaving={markLeaving}
+        onLeavingCancelled={unmarkLeaving}
+      />
     </div>
   );
 }
 
-function ConfirmCandidateModal({ candidate, onClose }: { candidate: RecurringCandidate | null; onClose: () => void }) {
+function ConfirmCandidateModal({
+  candidate,
+  onClose,
+  onLeaving,
+  onLeavingCancelled,
+}: {
+  candidate: RecurringCandidate | null;
+  onClose: () => void;
+  onLeaving: (id: string) => void;
+  onLeavingCancelled: (id: string) => void;
+}) {
   const dataset = useAppStore((s) => s.dataset)!;
   const apply = useAppStore((s) => s.apply);
   const [accountId, setAccountId] = useState(dataset.accounts[0]?.id ?? '');
@@ -228,12 +286,14 @@ function ConfirmCandidateModal({ candidate, onClose }: { candidate: RecurringCan
     const cents = Math.round(Number(amount) * 100);
     if (!Number.isFinite(cents) || cents <= 0 || !Number.isInteger(cents)) return setError('金额无效');
     if (!categoryId) return setError('请选择分类');
+    onClose();
+    onLeaving(candidate.id);
+    await new Promise((resolve) => setTimeout(resolve, 200));
     const ok = await apply(
       (d) => confirmCandidate(d, candidate, { accountId, categoryId, amount: cents, nextDate }),
       '已创建计划，后续可在此计划下核销',
     );
-    if (ok) onClose();
-    else setError('创建失败，请稍后重试');
+    if (!ok) onLeavingCancelled(candidate.id);
   };
 
   return (

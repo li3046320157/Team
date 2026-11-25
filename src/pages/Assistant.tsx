@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Bot, KeyRound, Link2, RefreshCw, Send, Settings2, Square, Trash2, User } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { Badge, Button, Card, Field, InfoNote, PageHeader, cn } from '../components/ui';
@@ -48,8 +48,11 @@ export function AssistantPage() {
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [leavingIdx, setLeavingIdx] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const messagesRef = useRef<UiMessage[]>(messages);
+  messagesRef.current = messages;
 
   useEffect(() => {
     if (!user) return;
@@ -145,12 +148,21 @@ export function AssistantPage() {
       });
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        setMessages((prev) => {
-          const next = [...prev];
-          const last = next[next.length - 1];
-          if (last && last.role === 'assistant' && !last.content) next.pop();
-          return next;
-        });
+        const msgs = messagesRef.current;
+        const last = msgs[msgs.length - 1];
+        if (last && last.role === 'assistant' && !last.content) {
+          setLeavingIdx(msgs.length - 1);
+          window.setTimeout(() => {
+            setMessages((prev) => {
+              if (prev.length !== msgs.length) return prev;
+              const next = [...prev];
+              const l = next[next.length - 1];
+              if (l && l.role === 'assistant' && !l.content) next.pop();
+              return next;
+            });
+            setLeavingIdx(null);
+          }, 200);
+        }
       } else {
         const message = error instanceof AiError || error instanceof Error ? error.message : '请求失败，请重试';
         setChatError(message);
@@ -185,8 +197,10 @@ export function AssistantPage() {
             </Button>
           }
         >
-          {configOpen ? (
-            <div className="space-y-3.5">
+          <div className="config-collapse" data-open={configOpen}>
+            <div>
+              {configOpen ? (
+                <div className="space-y-3.5">
               <Field label="API 访问地址" hint="填到 /v1 这一级即可，例如 https://api.openai.com/v1；该地址必须允许浏览器跨域（CORS）访问">
                 <div className="relative">
                   <Link2 size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#A3A097]" />
@@ -225,14 +239,16 @@ export function AssistantPage() {
               <InfoNote tone="warn">
                 密钥与对话只存本机；分析请求由浏览器直接发往你填写的地址，请确认该服务可信。如果地址没有返回跨域许可（CORS），浏览器会直接拦截请求，网页端无法绕过；请更换支持 CORS 的官方接口或中转，也可以先手动填写模型名保存配置。
               </InfoNote>
+                </div>
+              ) : (
+                <div className="space-y-2 text-[12px] leading-relaxed text-[#6B6A63]">
+                  <p className="truncate">地址：{savedConfig?.baseUrl}</p>
+                  <p>模型：{savedConfig?.model}</p>
+                  <p>密钥：{savedConfig ? maskKey(savedConfig.apiKey) : ''}</p>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="space-y-2 text-[12px] leading-relaxed text-[#6B6A63]">
-              <p className="truncate">地址：{savedConfig?.baseUrl}</p>
-              <p>模型：{savedConfig?.model}</p>
-              <p>密钥：{savedConfig ? maskKey(savedConfig.apiKey) : ''}</p>
-            </div>
-          )}
+          </div>
         </Card>
 
         <Card title="分析对话" subtitle="基于你本机账本的实时摘要" className="flex flex-col">
@@ -255,7 +271,9 @@ export function AssistantPage() {
                   className={cn(
                     'max-w-[85%] whitespace-pre-wrap rounded-xl px-3.5 py-2.5 text-[12.5px] leading-relaxed',
                     m.role === 'user' ? 'bg-[#0E7568] text-white' : 'border border-[#E4E0D8] bg-white text-[#1F2421]',
+                    i === leavingIdx ? 'row-collapse' : 'rise',
                   )}
+                  style={{ '--rise-x': m.role === 'user' ? '6px' : '-6px' } as CSSProperties}
                   data-testid={m.role === 'assistant' ? 'assistant-msg' : 'user-msg'}
                 >
                   {m.content}
@@ -268,11 +286,12 @@ export function AssistantPage() {
           {chatError && <p className="mb-3 rounded-lg bg-[#FCF1EF] px-3 py-2 text-[12px] text-[#98362E]" role="alert" data-testid="chat-error">{chatError}</p>}
 
           <div className="mb-3 flex flex-wrap gap-2">
-            {QUICK_PROMPTS.map((q) => (
+            {QUICK_PROMPTS.map((q, i) => (
               <button
                 key={q}
                 type="button"
-                className="rounded-full border border-[#E4E0D8] bg-white px-3 py-1.5 text-[11.5px] font-medium text-[#0B6357] transition hover:border-[#0E7568] hover:bg-[#E3F1ED] disabled:opacity-50"
+                className="rise rounded-full border border-[#E4E0D8] bg-white px-3 py-1.5 text-[11.5px] font-medium text-[#0B6357] transition hover:border-[#0E7568] hover:bg-[#E3F1ED] disabled:opacity-50"
+                style={{ '--i': i } as CSSProperties}
                 onClick={() => void send(q)}
                 disabled={streaming || !savedConfig}
               >
