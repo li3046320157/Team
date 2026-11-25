@@ -14,14 +14,26 @@ import {
 } from 'lucide-react';
 import type { Transaction } from '../domain/types';
 import { useAppStore } from '../store/useAppStore';
-import { addDaysISO, addMonthsAnchored, formatCN, todayISO } from '../domain/days';
+import { formatCN, todayISO } from '../domain/days';
 import { parseMoneyInput } from '../domain/money';
-import { monthIncomeExpense } from '../domain/ledger';
+import { rangeIncomeExpense } from '../domain/ledger';
 import { parseQuickEntry } from '../domain/quickEntry';
 import { addTransaction, deleteTransaction, updateTransaction, type TxnInput } from '../services/mutations';
 import { TransactionForm } from '../components/TransactionForm';
 import { Badge, Button, Card, CategoryIcon, EmptyState, Field, Modal, Money, PageHeader, Segmented, cn } from '../components/ui';
-import { kindLabel, monthLabel, natureLabel } from '../lib/ui';
+import { kindLabel } from '../lib/ui';
+import {
+  GROUP_OPTIONS,
+  RANGE_OPTIONS,
+  defaultGroupFor,
+  fullDateCN,
+  groupKey,
+  groupLabel,
+  rangeDayCount,
+  rangeStart,
+  type GroupUnit,
+  type MonitorRange,
+} from '../lib/period';
 
 function txToInput(t: Transaction): TxnInput {
   return {
@@ -43,7 +55,9 @@ export function LedgerPage() {
   const notify = useAppStore((s) => s.notify);
   const [params] = useSearchParams();
   const today = todayISO();
-  const [month, setMonth] = useState(today.slice(0, 7));
+  const [range, setRange] = useState<MonitorRange>('month');
+  const [end, setEnd] = useState(today);
+  const [groupUnit, setGroupUnit] = useState<GroupUnit>(defaultGroupFor('month'));
   const [kind, setKind] = useState<'all' | 'income' | 'expense' | 'transfer'>('all');
   const [categoryId, setCategoryId] = useState('');
   const [search, setSearch] = useState('');
@@ -85,19 +99,22 @@ export function LedgerPage() {
   const accountName = useMemo(() => new Map(dataset.accounts.map((a) => [a.id, a.name])), [dataset.accounts]);
   const categoryById = useMemo(() => new Map(dataset.categories.map((c) => [c.id, c])), [dataset.categories]);
 
-  const monthOptions = useMemo(() => {
-    const out: string[] = [];
-    for (let i = 0; i < 12; i += 1) {
-      const d = addMonthsAnchored(today, -i, 1);
-      out.push(d.slice(0, 7));
-    }
-    return out;
-  }, [today]);
+  const start = useMemo(() => rangeStart(end, range), [end, range]);
+  const dayCount = rangeDayCount(start, end);
+
+  const pickRange = (next: MonitorRange) => {
+    setRange(next);
+    setGroupUnit(defaultGroupFor(next));
+  };
+
+  const pickEnd = (next: string) => {
+    setEnd(next && next <= today ? next : today);
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return dataset.transactions
-      .filter((t) => t.date.slice(0, 7) === month)
+      .filter((t) => t.date >= start && t.date <= end)
       .filter((t) => (kind === 'all' ? true : t.kind === kind))
       .filter((t) => (categoryId ? t.categoryId === categoryId : true))
       .filter((t) => {
@@ -105,21 +122,23 @@ export function LedgerPage() {
         return [t.merchant, t.note, categoryById.get(t.categoryId ?? '')?.name].some((v) => v?.toLowerCase().includes(q));
       })
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.createdAt < b.createdAt ? 1 : -1));
-  }, [dataset.transactions, month, kind, categoryId, search, categoryById]);
+  }, [dataset.transactions, start, end, kind, categoryId, search, categoryById]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, Transaction[]>();
     for (const t of filtered) {
-      const list = map.get(t.date) ?? [];
+      const key = groupKey(t.date, groupUnit);
+      const list = map.get(key) ?? [];
       list.push(t);
-      map.set(t.date, list);
+      map.set(key, list);
     }
-    return [...map.entries()];
-  }, [filtered]);
+    return [...map.entries()].map(([key, txns]) => ({ key, label: groupLabel(key, groupUnit), txns }));
+  }, [filtered, groupUnit]);
 
-  const stats = useMemo(() => monthIncomeExpense(dataset.transactions, month), [dataset.transactions, month]);
+  const stats = useMemo(() => rangeIncomeExpense(dataset.transactions, start, end), [dataset.transactions, start, end]);
+  const dailyExpense = Math.round(stats.expense / dayCount);
   const quick = useMemo(() => (quickText.trim() ? parseQuickEntry(quickText, today) : null), [quickText, today]);
-  const listKey = `${month}|${kind}|${categoryId}`;
+  const listKey = `${range}|${end}|${groupUnit}|${kind}|${categoryId}`;
 
   const quickCategory = quick?.categoryHint
     ? dataset.categories.find((c) => c.name === quick.categoryHint && c.kind === quick.kind)
@@ -220,54 +239,71 @@ export function LedgerPage() {
           )}
 
           <Card padded={false}>
-            <div className="flex flex-wrap items-center gap-2 border-b border-[#EFECE6] px-4 py-3">
-              <input className="input !w-auto !py-1.5 text-xs" type="month" value={month} max={today.slice(0, 7)} onChange={(e) => setMonth(e.target.value)} aria-label="月份" />
-              <Segmented
-                value={kind}
-                onChange={setKind}
-                size="sm"
-                options={[
-                  { value: 'all', label: '全部' },
-                  { value: 'expense', label: '支出' },
-                  { value: 'income', label: '收入' },
-                  { value: 'transfer', label: '转账' },
-                ]}
-              />
-              <select className="select !w-auto !py-1.5 text-xs" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-label="分类筛选">
-                <option value="">全部分类</option>
-                {dataset.categories.filter((c) => !c.archived).map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              <div className="relative ml-auto min-w-[160px] flex-1 sm:flex-none">
-                <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#A3A097]" />
-                <input className="input !py-1.5 !pl-8 text-xs" placeholder="搜商户或备注" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <div className="space-y-2.5 border-b border-[#EFECE6] px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Segmented<MonitorRange> value={range} onChange={pickRange} size="sm" options={RANGE_OPTIONS} />
+                <label className="flex items-center gap-1.5 text-[11px] text-[#8A887F]">
+                  截止
+                  <input className="input !w-auto !py-1.5 text-xs" type="date" value={end} max={today} onChange={(e) => pickEnd(e.target.value)} aria-label="统计截止日期" />
+                </label>
+                <div className="ml-auto flex items-center gap-1.5">
+                  <span className="text-[10.5px] text-[#A3A097]">分组</span>
+                  <Segmented<GroupUnit> value={groupUnit} onChange={setGroupUnit} size="sm" options={GROUP_OPTIONS} />
+                </div>
               </div>
-              <div className="num flex w-full items-center justify-between gap-3 border-t border-[#F0EDE6] pt-2 text-[11.5px] text-[#6B6A63] sm:w-auto sm:border-0 sm:pt-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Segmented
+                  value={kind}
+                  onChange={setKind}
+                  size="sm"
+                  options={[
+                    { value: 'all', label: '全部' },
+                    { value: 'expense', label: '支出' },
+                    { value: 'income', label: '收入' },
+                    { value: 'transfer', label: '转账' },
+                  ]}
+                />
+                <select className="select !w-auto !py-1.5 text-xs" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} aria-label="分类筛选">
+                  <option value="">全部分类</option>
+                  {dataset.categories.filter((c) => !c.archived).map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <div className="relative ml-auto min-w-[160px] flex-1 sm:flex-none">
+                  <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[#A3A097]" />
+                  <input className="input !py-1.5 !pl-8 text-xs" placeholder="搜商户或备注" value={search} onChange={(e) => setSearch(e.target.value)} />
+                </div>
+              </div>
+              <div className="num flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[#F0EDE6] pt-2 text-[11.5px] text-[#6B6A63]">
+                <span className="text-[#8A887F]">{fullDateCN(start)} – {fullDateCN(end)} · {dayCount} 天</span>
                 <span>收入 <span className="font-semibold text-[#0B6357]">{formatMoney(stats.income)}</span></span>
                 <span>支出 <span className="font-semibold text-[#98362E]">{formatMoney(stats.expense)}</span></span>
                 <span>结余 <span className="font-semibold text-[#1F2421]">{formatMoney(stats.net)}</span></span>
+                <span>日均支出 <span className="font-semibold text-[#1F2421]">{formatMoney(dailyExpense)}</span></span>
               </div>
             </div>
 
             {grouped.length === 0 ? (
               <div className="p-4">
                 <EmptyState
-                  title="这个月还没有流水"
-                  description={dataset.transactions.length === 0 ? '从「记一笔」或快速记账开始。' : '换个月份或清除筛选条件看看。'}
+                  title="所选区间还没有流水"
+                  description={dataset.transactions.length === 0 ? '从「记一笔」或快速记账开始。' : '调整时间范围、分组或清除筛选条件看看。'}
                   action={<Button variant="primary" onClick={() => { setEditing(null); setFormOpen(true); }}><Plus size={14} /> 记一笔</Button>}
                 />
               </div>
             ) : (
               <div key={listKey} className="divide-y divide-[#F0EDE6]">
-                {grouped.map(([date, txns], dayIndex) => {
-                  const dayNet = txns.reduce((sum, t) => sum + (t.kind === 'income' ? t.amount : t.kind === 'expense' ? -t.amount : 0), 0);
+                {grouped.map(({ key, label, txns }, groupIndex) => {
+                  const groupNet = txns.reduce((sum, t) => sum + (t.kind === 'income' ? t.amount : t.kind === 'expense' ? -t.amount : 0), 0);
                   return (
-                    <div key={date} className="ledger-day px-4 py-3" style={{ '--stagger': Math.min(dayIndex, 10) } as CSSProperties}>
+                    <div key={key} className="ledger-day px-4 py-3" style={{ '--stagger': Math.min(groupIndex, 10) } as CSSProperties}>
                       <div className="mb-2 flex items-center justify-between">
-                        <p className="text-[11.5px] font-semibold text-[#6B6A63]">{formatCN(date)}</p>
-                        <span className={cn('num text-[10.5px]', dayNet >= 0 ? 'text-[#0B6357]' : 'text-[#98362E]')}>
-                          {dayNet >= 0 ? '+' : ''}{formatMoney(dayNet)}
+                        <p className="text-[11.5px] font-semibold text-[#6B6A63]">
+                          {label}
+                          {groupUnit !== 'day' && <span className="ml-1 font-normal text-[#A3A097]">· {txns.length} 笔</span>}
+                        </p>
+                        <span className={cn('num text-[10.5px]', groupNet >= 0 ? 'text-[#0B6357]' : 'text-[#98362E]')}>
+                          {groupNet >= 0 ? '+' : ''}{formatMoney(groupNet)}
                         </span>
                       </div>
                       <ul className="space-y-1">
@@ -310,24 +346,24 @@ export function LedgerPage() {
                     </div>
                   );
                 })}
-                <div className="px-4 py-3 text-center text-[11px] text-[#A3A097]">共 {filtered.length} 笔，按日期倒序显示。</div>
+                <div className="px-4 py-3 text-center text-[11px] text-[#A3A097]">共 {filtered.length} 笔 · 按{groupUnit === 'day' ? '日' : groupUnit === 'month' ? '月' : '年'}分组倒序显示。</div>
               </div>
             )}
           </Card>
         </div>
 
         <div className="space-y-4">
-          <Card title="本月分类" subtitle={`${monthLabel(month)} · 不含转账`}>
+          <Card title="区间分类" subtitle={`${fullDateCN(start)} – ${fullDateCN(end)} · 不含转账`}>
             {(() => {
               const totals = new Map<string, number>();
               for (const t of dataset.transactions) {
-                if (t.date.slice(0, 7) !== month || t.kind !== 'expense') continue;
+                if (t.date < start || t.date > end || t.kind !== 'expense') continue;
                 const key = t.categoryId ?? 'none';
                 totals.set(key, (totals.get(key) ?? 0) + t.amount);
               }
               const rows = [...totals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
               const total = rows.reduce((sum, [, v]) => sum + v, 0);
-              if (rows.length === 0) return <p className="text-[12px] text-[#8A887F]">本月还没有支出。</p>;
+              if (rows.length === 0) return <p className="text-[12px] text-[#8A887F]">所选区间还没有支出。</p>;
               return (
                 <ul className="space-y-3">
                   {rows.map(([key, value]) => {

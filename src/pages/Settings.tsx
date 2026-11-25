@@ -6,7 +6,8 @@ import { formatMoney, parseMoneyInput } from '../domain/money';
 import { validateCoverage } from '../domain/ledger';
 import { wipeAllLocalData } from '../data/wipe';
 import type { AccountType, CoverageInterval } from '../domain/types';
-import { Badge, Button, Card, Field, InfoNote, Modal, Money, PageHeader, Switch, cn } from '../components/ui';
+import { Badge, Button, Card, Field, InfoNote, Modal, Money, PageHeader, Segmented, Switch, cn } from '../components/ui';
+import { getMotionLevel, setMotionLevel, type MotionLevel } from '../motion/preference';
 
 const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = { cash: '现金', savings: '储蓄卡', ewallet: '电子钱包' };
 
@@ -25,8 +26,15 @@ export function SettingsPage() {
   const dataset = useAppStore((s) => s.dataset)!;
   const apply = useAppStore((s) => s.apply);
   const addAccountAction = useAppStore((s) => s.addAccount);
+  const notify = useAppStore((s) => s.notify);
   const today = todayISO();
   const s = dataset.settings;
+  const [motion, setMotionState] = useState<MotionLevel>(() => getMotionLevel());
+  const changeMotion = (level: MotionLevel) => {
+    setMotionLevel(level);
+    setMotionState(level);
+    notify(level === 'full' ? '已切换为完整动效' : '已切换为精简动效', 'success');
+  };
   const [safety, setSafety] = useState(s.safetyReserve ? (s.safetyReserve / 100).toFixed(2) : '');
   const [budget, setBudget] = useState(s.budget.monthVariableBudget ? (s.budget.monthVariableBudget / 100).toFixed(2) : '');
   const [savingsCap, setSavingsCap] = useState(s.budget.monthlySavingsCap ? (s.budget.monthlySavingsCap / 100).toFixed(2) : '');
@@ -270,7 +278,26 @@ export function SettingsPage() {
           </p>
         </Card>
 
-        <Card className="rise" style={{ '--i': 6 } as CSSProperties} title="本机数据" subtitle="账户、账本与 AI 配置都只存在于当前浏览器" action={<Trash2 size={15} className="text-[#98362E]" />}>
+        <Card className="rise" style={{ '--i': 6 } as CSSProperties} title="界面动效" subtitle="默认完整展示，不依赖系统设置；可随时切换为精简" action={<Sparkles size={15} className="text-[#0B6357]" />}>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#E4E0D8] bg-[#FCFBF8] px-3 py-2.5">
+            <div>
+              <p className="text-[12.5px] font-medium">动效强度</p>
+              <p className="mt-0.5 text-[10.5px] leading-relaxed text-[#8A887F]">完整：页面滚动渐显、数字滚动与悬停反馈；精简：仅保留淡入。</p>
+            </div>
+            <Segmented<MotionLevel>
+              value={motion}
+              onChange={changeMotion}
+              size="sm"
+              options={[
+                { value: 'full', label: '完整动效' },
+                { value: 'reduced', label: '精简动效' },
+              ]}
+            />
+          </div>
+          <p className="mt-2 text-[10.5px] leading-relaxed text-[#8A887F]">偏好保存在本机，只影响当前浏览器的展示效果。</p>
+        </Card>
+
+        <Card className="rise" style={{ '--i': 7 } as CSSProperties} title="本机数据" subtitle="账户、账本与 AI 配置都只存在于当前浏览器" action={<Trash2 size={15} className="text-[#98362E]" />}>
           <p className="text-[11.5px] leading-relaxed text-[#6B6A63]">
             清除后会删除本机所有账户、账本、目标与 AI 接口配置，并回到登录页；此操作无法撤销，请先到数据中心导出备份。
           </p>
@@ -279,7 +306,7 @@ export function SettingsPage() {
           </Button>
         </Card>
 
-        <Card className="rise" style={{ '--i': 7 } as CSSProperties} title="关于与数据原则" subtitle="MoneyFlow 钱流 · 本地优先的个人现金流工作台" action={<Settings2 size={15} className="text-[#8A887F]" />}>
+        <Card className="rise" style={{ '--i': 8 } as CSSProperties} title="关于与数据原则" subtitle="MoneyFlow 钱流 · 本地优先的个人现金流工作台" action={<Settings2 size={15} className="text-[#8A887F]" />}>
           <ul className="space-y-2 text-[11.5px] leading-relaxed text-[#6B6A63]">
             <li>版本 1.0.0 · 数据格式 v1 · 设置版本 v{s.settingsVersion}</li>
             <li>所有数据存于浏览器 IndexedDB，不上传；备份文件由你自行保管。</li>

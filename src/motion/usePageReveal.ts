@@ -1,5 +1,5 @@
 import { type RefObject } from 'react';
-import { gsap, prefersReducedMotion, REVEAL_SELECTOR, ScrollTrigger, useGSAP } from './gsap';
+import { gsap, isReducedMotion, REVEAL_SELECTOR, ScrollTrigger, useGSAP } from './gsap';
 
 const VIEW_EDGE = 0.92;
 
@@ -24,7 +24,7 @@ export function usePageReveal(scopeRef: RefObject<HTMLDivElement | null>, pageKe
   useGSAP(() => {
     const root = scopeRef.current;
     if (!root) return;
-    const reduce = prefersReducedMotion();
+    const reduce = isReducedMotion();
     const batches: ScrollTrigger[] = [];
 
     // 先复位滚动，再按首屏位置决定哪些内容需要滚动显现

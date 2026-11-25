@@ -984,71 +984,69 @@ table.data tbody tr:hover {
   outline-offset: 2px;
 }
 
-/* 系统开启「减弱动态效果」时：入场动画改为纯淡入、装饰循环放慢，避免 0.01ms 无限循环造成闪烁 */
-@media (prefers-reduced-motion: reduce) {
-  .fade-in,
-  .auth-card,
-  .chart-enter,
-  .ledger-day,
-  .toast-pop,
-  .modal-panel,
-  .stat-in {
-    animation: softFade 320ms ease both;
-  }
-  .balance-pulse,
-  .page-title,
-  .digit-roll-old,
-  .digit-roll-new,
-  .ripple,
-  .toast-check,
-  .modal-scrim,
-  .rise,
-  .rise.balance-pulse,
-  .stat-in.balance-pulse,
-  .fade-swap,
-  .hl-fade,
-  .badge-pop {
-    animation: none;
-  }
-  .row-collapse,
-  .switch,
-  .switch-knob,
-  .config-collapse,
-  .ledger-row,
-  .row-icon {
-    transition: none;
-  }
-  .burst-coin {
-    display: none;
-  }
-  .shake,
-  .auth-blob,
-  .auth-logo,
-  .auth-waves {
-    animation: none;
-  }
-  .auth-coin {
-    animation-duration: 26s !important;
-  }
-  .auth-wave {
-    animation-duration: 6s;
-  }
-  .typing-caret {
-    animation: none;
-    opacity: 1;
-  }
-  .scroll-progress {
-    display: none;
-  }
-  .card:hover {
-    transform: none;
-  }
-  .app-header {
-    transition: none;
-  }
-  .nav-link svg {
-    transition: none;
-  }
+/* 应用内选择「精简动效」时：入场改为纯淡入、装饰循环放慢，避免 0.01ms 无限循环造成闪烁 */
+:root[data-motion='reduced'] .fade-in,
+:root[data-motion='reduced'] .auth-card,
+:root[data-motion='reduced'] .chart-enter,
+:root[data-motion='reduced'] .ledger-day,
+:root[data-motion='reduced'] .toast-pop,
+:root[data-motion='reduced'] .modal-panel,
+:root[data-motion='reduced'] .stat-in {
+  animation: softFade 320ms ease both;
+}
+:root[data-motion='reduced'] .balance-pulse,
+:root[data-motion='reduced'] .page-title,
+:root[data-motion='reduced'] .digit-roll-old,
+:root[data-motion='reduced'] .digit-roll-new,
+:root[data-motion='reduced'] .ripple,
+:root[data-motion='reduced'] .toast-check,
+:root[data-motion='reduced'] .modal-scrim,
+:root[data-motion='reduced'] .rise,
+:root[data-motion='reduced'] .rise.balance-pulse,
+:root[data-motion='reduced'] .stat-in.balance-pulse,
+:root[data-motion='reduced'] .fade-swap,
+:root[data-motion='reduced'] .hl-fade,
+:root[data-motion='reduced'] .badge-pop {
+  animation: none;
+}
+:root[data-motion='reduced'] .row-collapse,
+:root[data-motion='reduced'] .switch,
+:root[data-motion='reduced'] .switch-knob,
+:root[data-motion='reduced'] .config-collapse,
+:root[data-motion='reduced'] .ledger-row,
+:root[data-motion='reduced'] .row-icon {
+  transition: none;
+}
+:root[data-motion='reduced'] .burst-coin {
+  display: none;
+}
+:root[data-motion='reduced'] .shake,
+:root[data-motion='reduced'] .auth-blob,
+:root[data-motion='reduced'] .auth-logo,
+:root[data-motion='reduced'] .auth-waves {
+  animation: none;
+}
+:root[data-motion='reduced'] .auth-coin {
+  animation-duration: 26s !important;
+}
+:root[data-motion='reduced'] .auth-wave {
+  animation-duration: 6s;
+}
+:root[data-motion='reduced'] .typing-caret {
+  animation: none;
+  opacity: 1;
+}
+:root[data-motion='reduced'] .scroll-progress {
+  display: none;
+}
+:root[data-motion='reduced'] .card:hover {
+  transform: none;
+}
+:root[data-motion='reduced'] .app-header {
+  transition: none;
+}
+:root[data-motion='reduced'] .nav-link svg {
+  transition: none;
 }
 @keyframes softFade {
   from {

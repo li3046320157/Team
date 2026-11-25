@@ -4,7 +4,7 @@ import type { EChartsOption } from 'echarts';
 import { cn } from './ui';
 
 function motionScale(): number {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 0;
+  if (document.documentElement.dataset.motion === 'reduced') return 0;
   const raw = getComputedStyle(document.documentElement).getPropertyValue('--site-motion').trim();
   const n = Number(raw);
   return Number.isFinite(n) && n >= 0 ? n : 1;
