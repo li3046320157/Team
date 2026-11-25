@@ -23,7 +23,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { formatMoney, formatMoneyShort } from '../domain/money';
-import { gsap, prefersReducedMotion, useGSAP } from '../motion/gsap';
+import { gsap, isReducedMotion, useGSAP } from '../motion/gsap';
 import { useAppStore } from '../store/useAppStore';
 
 export function cn(...parts: Array<string | false | null | undefined>): string {
@@ -180,7 +180,7 @@ export function Progress({ value, max, tone = 'teal' }: { value: number; max: nu
   useGSAP(() => {
     const bar = barRef.current;
     if (!bar) return;
-    const reduce = prefersReducedMotion();
+    const reduce = isReducedMotion();
     gsap.fromTo(
       bar,
       { scaleX: 0 },

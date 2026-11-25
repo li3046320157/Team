@@ -46,6 +46,23 @@ export function monthIncomeExpense(
   return { income, expense, net: income - expense };
 }
 
+/** 统计任意闭区间 [start, end] 的收入、支出与结余，转账不计入。 */
+export function rangeIncomeExpense(
+  transactions: Transaction[],
+  start: ISODate,
+  end: ISODate,
+): { income: Cents; expense: Cents; net: Cents } {
+  let income = 0;
+  let expense = 0;
+  for (const t of transactions) {
+    if (t.kind === 'transfer') continue;
+    if (t.date < start || t.date > end) continue;
+    if (t.kind === 'income') income += t.amount;
+    else expense += t.amount;
+  }
+  return { income, expense, net: income - expense };
+}
+
 export function reservedByGoal(events: GoalFundEvent[], asOf: ISODate): Map<string, Cents> {
   const map = new Map<string, Cents>();
   for (const e of events) {

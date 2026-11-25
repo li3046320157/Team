@@ -5,6 +5,7 @@ import {
   goalViews,
   isVariableExpense,
   monthIncomeExpense,
+  rangeIncomeExpense,
   totalBalanceAt,
   totalReservedAt,
   variableExpenseByDay,
@@ -20,6 +21,17 @@ describe('账户余额与资金守恒', () => {
     ];
     expect(accountBalanceAt(acc, txns, '2026-01-31')).toBe(130_000);
     expect(monthIncomeExpense(txns, '2026-01')).toEqual({ income: 50_000, expense: 20_000, net: 30_000 });
+  });
+
+  it('区间统计按闭区间汇总，边界日期与转账口径正确', () => {
+    const txns = [
+      makeTxn({ id: 'in', kind: 'income', amount: 80_000, date: '2026-06-01' }),
+      makeTxn({ id: 'out', kind: 'expense', amount: 20_000, date: '2026-06-30' }),
+      makeTxn({ id: 'next', kind: 'expense', amount: 30_000, date: '2026-07-01' }),
+      makeTxn({ id: 'tr', kind: 'transfer', amount: 50_000, date: '2026-06-15', toAccountId: 'b' }),
+    ];
+    expect(rangeIncomeExpense(txns, '2026-06-01', '2026-06-30')).toEqual({ income: 80_000, expense: 20_000, net: 60_000 });
+    expect(rangeIncomeExpense(txns, '2026-06-01', '2026-06-01')).toEqual({ income: 80_000, expense: 0, net: 80_000 });
   });
 
   it('转账不改变总资产、收入与支出统计', () => {

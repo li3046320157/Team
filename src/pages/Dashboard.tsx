@@ -31,7 +31,7 @@ import { buildOccurrenceViews } from '../domain/occurrences';
 import { formatMoneyShort } from '../domain/money';
 import { EChart } from '../components/Chart';
 import { Badge, Button, Card, EmptyState, AnimatedMoney, Money, Progress, StatCard, cn } from '../components/ui';
-import { gsap, prefersReducedMotion, useGSAP } from '../motion/gsap';
+import { gsap, isReducedMotion, useGSAP } from '../motion/gsap';
 import { dueLabel, monthLabel, riskText } from '../lib/ui';
 
 const FEATURES = [
@@ -160,7 +160,7 @@ export function DashboardPage() {
 
   useGSAP(() => {
     if (!heroRef.current) return;
-    const reduce = prefersReducedMotion();
+    const reduce = isReducedMotion();
     const items = gsap.utils.toArray<HTMLElement>('[data-hero-item]', heroRef.current);
     if (items.length === 0) return;
     gsap.from(items, {
