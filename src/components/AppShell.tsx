@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Bot,
@@ -19,6 +19,9 @@ import {
   X,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { ScrollTrigger } from '../motion/gsap';
+import { ScrollProgress } from '../motion/ScrollProgress';
+import { usePageReveal } from '../motion/usePageReveal';
 import { cn } from './ui';
 
 const NAV = [
@@ -51,14 +54,36 @@ function Brand() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const user = useAppStore((s) => s.user);
+  const dataset = useAppStore((s) => s.dataset);
   const logout = useAppStore((s) => s.logout);
   const navigate = useNavigate();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
   const activeLabel = NAV.find((n) => n.to === location.pathname)?.label ?? 'MoneyFlow';
+  const pageRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+
+  usePageReveal(pageRef, location.pathname);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => ScrollTrigger.refresh(), 160);
+    return () => window.clearTimeout(timer);
+  }, [dataset]);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const trigger = ScrollTrigger.create({
+      start: 8,
+      end: 'max',
+      onToggle: (self) => header.classList.toggle('is-scrolled', self.isActive),
+    });
+    return () => trigger.kill();
+  }, []);
 
   return (
     <div className="min-h-screen">
+      <ScrollProgress />
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] flex-col border-r border-[#E7E3DA] bg-[#FBF9F4]/90 px-4 py-5 backdrop-blur lg:flex">
         <Brand />
         <nav className="mt-7 flex flex-1 flex-col gap-0.5" aria-label="主导航">
@@ -90,7 +115,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="lg:pl-[232px]">
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-[#E7E3DA] bg-[#F7F5F1]/85 px-4 py-3 backdrop-blur lg:hidden">
+        <header ref={headerRef} className="app-header sticky top-0 z-20 flex items-center justify-between border-b border-[#E7E3DA] bg-[#F7F5F1]/85 px-4 py-3 backdrop-blur lg:hidden">
           <Brand />
           <div className="flex items-center gap-2">
             <span className="chip chip-teal">本机账本</span>
@@ -101,7 +126,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
 
         <main className="mx-auto w-full max-w-[1180px] px-4 pb-28 pt-5 sm:px-6 lg:pb-12 lg:pt-8">
-          <div key={location.pathname} className="page-enter">{children}</div>
+          <div ref={pageRef} key={location.pathname} className="page-motion">{children}</div>
         </main>
       </div>
 

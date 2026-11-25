@@ -145,10 +145,10 @@ export function ForecastPage() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard key={horizon} className="balance-pulse" label={`${horizon} 天后余额`} value={<Money cents={end} />} hint="按当前计划与消费模型推算" tone={end < 0 ? 'danger' : 'default'} />
-        <StatCard key={horizon} className="balance-pulse" label="预测期最低余额" value={<Money cents={risk.minBalance} />} hint={`${formatCN(risk.minBalanceDate)} · 最低可用 ${formatMoneyShort(risk.minFree)}`} tone={level === 'danger' ? 'danger' : level === 'warning' ? 'amber' : 'teal'} />
+        <StatCard key={`end-${horizon}`} className="balance-pulse" label={`${horizon} 天后余额`} value={<Money cents={end} />} hint="按当前计划与消费模型推算" tone={end < 0 ? 'danger' : 'default'} />
+        <StatCard key={`min-${horizon}`} className="balance-pulse" label="预测期最低余额" value={<Money cents={risk.minBalance} />} hint={`${formatCN(risk.minBalanceDate)} · 最低可用 ${formatMoneyShort(risk.minFree)}`} tone={level === 'danger' ? 'danger' : level === 'warning' ? 'amber' : 'teal'} />
         <StatCard
-          key={horizon}
+          key={`risk-${horizon}`}
           className="balance-pulse"
           label="现金流状态"
           value={<span className="text-[18px]">{riskText(level)}</span>}
@@ -159,7 +159,7 @@ export function ForecastPage() {
           }
           tone={level === 'danger' ? 'danger' : level === 'warning' ? 'amber' : 'default'}
         />
-        <StatCard key={horizon} className="balance-pulse" label="目标预留合计" value={<Money cents={forecast.baseReserved} />} hint="可用 = 余额 − 预留 − 安全储备" />
+        <StatCard key={`reserved-${horizon}`} className="balance-pulse" label="目标预留合计" value={<Money cents={forecast.baseReserved} />} hint="可用 = 余额 − 预留 − 安全储备" />
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.55fr_1fr]">

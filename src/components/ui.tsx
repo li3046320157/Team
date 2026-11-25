@@ -23,6 +23,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { formatMoney, formatMoneyShort } from '../domain/money';
+import { gsap, prefersReducedMotion, useGSAP } from '../motion/gsap';
 import { useAppStore } from '../store/useAppStore';
 
 export function cn(...parts: Array<string | false | null | undefined>): string {
@@ -71,7 +72,7 @@ export function Card({
   padded?: boolean;
 }) {
   return (
-    <section className={cn('card', className)} style={style}>
+    <section className={cn('card', className)} style={style} data-reveal="">
       {(title || action) && (
         <header className="flex items-start justify-between gap-3 px-5 pt-5">
           <div>
@@ -88,7 +89,7 @@ export function Card({
 
 export function PageHeader({ title, description, actions }: { title: string; description?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between" data-reveal="">
       <div>
         <h1 className="page-title text-[26px] font-semibold tracking-[-0.02em] text-[#1F2421]">{title}</h1>
         {description && <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-[#6B6A63]">{description}</p>}
@@ -172,31 +173,30 @@ export function Badge({ tone = 'gray', children }: { tone?: 'teal' | 'amber' | '
 }
 
 export function Progress({ value, max, tone = 'teal' }: { value: number; max: number; tone?: 'teal' | 'amber' | 'danger' }) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
   const pct = max <= 0 ? 0 : Math.min(100, Math.max(0, (value / max) * 100));
-  const [width, setWidth] = useState(0);
-  useEffect(() => {
-    let raf2 = 0;
-    let fired = false;
-    const fire = () => {
-      if (fired) return;
-      fired = true;
-      setWidth(pct);
-    };
-    // double-rAF：让 0 起始态先渲染一帧，再切到目标值以触发过渡；后台标签页 rAF 被节流时由定时器兜底
-    const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(fire);
-    });
-    const fallback = setTimeout(fire, 120);
-    return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-      clearTimeout(fallback);
-    };
-  }, [pct]);
+
+  useGSAP(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    const reduce = prefersReducedMotion();
+    gsap.fromTo(
+      bar,
+      { scaleX: 0 },
+      {
+        scaleX: pct / 100,
+        duration: reduce ? 0 : 0.75,
+        ease: 'power3.out',
+        scrollTrigger: reduce ? undefined : { trigger: hostRef.current, start: 'top 92%', once: true },
+      },
+    );
+  }, { dependencies: [pct], scope: hostRef, revertOnUpdate: true });
+
   const color = tone === 'danger' ? '#B5453C' : tone === 'amber' ? '#B7791F' : '#0E7568';
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-[#EFECE6]">
-      <div className="h-full rounded-full" style={{ width: `${width}%`, background: color, transition: 'width calc(400ms * var(--site-motion, 1)) var(--ease-enter)' }} />
+    <div ref={hostRef} className="h-2 w-full overflow-hidden rounded-full bg-[#EFECE6]">
+      <div ref={barRef} className="h-full w-full rounded-full" style={{ background: color, transform: 'scaleX(0)', transformOrigin: 'left center' }} />
     </div>
   );
 }

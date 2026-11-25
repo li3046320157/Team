@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo, useRef, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -31,6 +31,7 @@ import { buildOccurrenceViews } from '../domain/occurrences';
 import { formatMoneyShort } from '../domain/money';
 import { EChart } from '../components/Chart';
 import { Badge, Button, Card, EmptyState, AnimatedMoney, Money, Progress, StatCard, cn } from '../components/ui';
+import { gsap, prefersReducedMotion, useGSAP } from '../motion/gsap';
 import { dueLabel, monthLabel, riskText } from '../lib/ui';
 
 const FEATURES = [
@@ -155,26 +156,43 @@ export function DashboardPage() {
   }, [chartDays, dataset.settings.safetyReserve]);
 
   const noAccounts = dataset.accounts.length === 0;
+  const heroRef = useRef<HTMLElement>(null);
+
+  useGSAP(() => {
+    if (!heroRef.current) return;
+    const reduce = prefersReducedMotion();
+    const items = gsap.utils.toArray<HTMLElement>('[data-hero-item]', heroRef.current);
+    if (items.length === 0) return;
+    gsap.from(items, {
+      opacity: 0,
+      y: reduce ? 0 : 18,
+      duration: reduce ? 0.35 : 0.7,
+      ease: 'power3.out',
+      stagger: reduce ? 0.05 : 0.09,
+      delay: 0.06,
+      clearProps: 'transform,opacity',
+    });
+  }, { scope: heroRef });
 
   return (
     <div className="fade-in" data-testid="dashboard">
-      <section className="card overflow-hidden" aria-labelledby="intro-heading">
+      <section ref={heroRef} className="card overflow-hidden" data-reveal="none" aria-labelledby="intro-heading">
         <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[1.25fr_0.75fr]">
           <div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#E3F1ED] px-2.5 py-1 text-[10.5px] font-semibold text-[#0B6357]">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#E3F1ED] px-2.5 py-1 text-[10.5px] font-semibold text-[#0B6357]" data-hero-item>
               <Sparkles size={12} /> 关于 MoneyFlow 钱流
             </span>
-            <h1 id="intro-heading" className="mt-3 text-[25px] font-semibold leading-[1.25] tracking-[-0.02em] sm:text-[30px]">
+            <h1 id="intro-heading" className="mt-3 text-[25px] font-semibold leading-[1.25] tracking-[-0.02em] sm:text-[30px]" data-hero-item>
               花钱之前，先把未来 90 天的现金流看清楚。
             </h1>
-            <p className="mt-3 max-w-2xl text-[13px] leading-relaxed text-[#5F5E57]">
+            <p className="mt-3 max-w-2xl text-[13px] leading-relaxed text-[#5F5E57]" data-hero-item>
               我们做这套系统，是因为「这个月钱去哪了」「下个月会不会透支」不该靠猜。MoneyFlow 把真实流水、固定计划与目标预留放进同一本本地账本，
               用可解释的模型给出余额预测，让你在做大额消费之前就能评估影响，而不是月底才后悔。
             </p>
-            <p className="mt-2 max-w-2xl text-[12px] leading-relaxed text-[#8A887F]">
+            <p className="mt-2 max-w-2xl text-[12px] leading-relaxed text-[#8A887F]" data-hero-item>
               所有账户与账单只保存在本机浏览器（IndexedDB），不上传服务器；预测只是规划参考，不构成收益承诺。
             </p>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="mt-4 flex flex-wrap items-center gap-2" data-hero-item>
               <Button variant="primary" onClick={() => navigate('/ledger?quick=1')} data-testid="quick-add">
                 <Plus size={15} /> 记一笔
               </Button>
@@ -186,7 +204,7 @@ export function DashboardPage() {
               <span className="chip">可解释预测</span>
             </div>
           </div>
-          <div className="rounded-2xl border border-[#E9E4DA] bg-[#FAF8F3] p-4">
+          <div className="rounded-2xl border border-[#E9E4DA] bg-[#FAF8F3] p-4" data-hero-item>
             <p className="text-[12px] font-semibold text-[#3A3D37]">推荐使用顺序</p>
             <ol className="mt-2.5 space-y-2 text-[11.5px] leading-relaxed text-[#6B6A63]">
               <li><span className="num mr-1.5 font-semibold text-[#0B6357]">1</span>建立账户，填写期初余额与安全储备线</li>
@@ -200,21 +218,24 @@ export function DashboardPage() {
           </div>
         </div>
         <div className="border-t border-[#EFECE6] p-5 sm:p-7">
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2" data-reveal="">
             <h2 className="text-[15px] font-semibold">全部功能 · 每个模块解决什么问题</h2>
             <p className="text-[10.5px] text-[#8A887F]">点击卡片进入对应页面</p>
           </div>
           <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {FEATURES.map((feature) => (
-              <li key={feature.title}>
-                <Link to={feature.to} className="flex h-full gap-2.5 rounded-xl border border-[#EFECE6] bg-[#FCFBF8] p-3 transition hover:border-[#BFE0D7] hover:bg-[#F7FBF9]">
-                  <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#E3F1ED] text-[#0B6357]">
+              <li key={feature.title} data-reveal="">
+                <Link
+                  to={feature.to}
+                  className="group flex h-full gap-2.5 rounded-xl border border-[#EFECE6] bg-[#FCFBF8] p-3 transition duration-200 hover:-translate-y-0.5 hover:border-[#BFE0D7] hover:bg-[#F7FBF9] hover:shadow-[0_10px_24px_-20px_rgba(14,117,104,0.55)]"
+                >
+                  <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#E3F1ED] text-[#0B6357] transition-transform duration-200 group-hover:scale-105">
                     <feature.icon size={15} />
                   </span>
                   <span className="min-w-0">
                     <span className="flex items-center gap-1 text-[12.5px] font-semibold">
                       {feature.title}
-                      <ChevronRight size={12} className="text-[#A3A097]" />
+                      <ChevronRight size={12} className="text-[#A3A097] transition-transform duration-200 group-hover:translate-x-0.5" />
                     </span>
                     <span className="mt-0.5 block text-[10.5px] leading-relaxed text-[#7A786F]">{feature.desc}</span>
                   </span>
@@ -225,7 +246,7 @@ export function DashboardPage() {
         </div>
       </section>
 
-      <div className="mb-3 mt-6 flex flex-wrap items-end justify-between gap-2">
+      <div className="mb-3 mt-6 flex flex-wrap items-end justify-between gap-2" data-reveal="">
         <div>
           <h2 className="text-[20px] font-semibold tracking-[-0.01em]">账本速览</h2>
           <p className="mt-1 text-[12px] text-[#8A887F]">{formatCN(today)} · {monthLabel(month)} · 总余额、待办与未来走势</p>

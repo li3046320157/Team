@@ -1,4 +1,4 @@
-import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { useEffect } from 'react';
 import { AppShell } from './components/AppShell';
 import { AuthPage } from './components/AuthPage';
@@ -17,8 +17,6 @@ import { SettingsPage } from './pages/Settings';
 import { AssistantPage } from './pages/Assistant';
 
 function Shell() {
-  const location = useLocation();
-
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as HTMLElement | null;
@@ -42,21 +40,19 @@ function Shell() {
   return (
     <>
       <AppShell>
-        <div key={location.pathname} className="page-enter">
-          <Routes>
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/ledger" element={<LedgerPage />} />
-            <Route path="/schedules" element={<SchedulesPage />} />
-            <Route path="/insights" element={<InsightsPage />} />
-            <Route path="/forecast" element={<ForecastPage />} />
-            <Route path="/assistant" element={<AssistantPage />} />
-            <Route path="/sandbox" element={<SandboxPage />} />
-            <Route path="/goals" element={<GoalsPage />} />
-            <Route path="/data" element={<DataCenterPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </div>
+        <Routes>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/ledger" element={<LedgerPage />} />
+          <Route path="/schedules" element={<SchedulesPage />} />
+          <Route path="/insights" element={<InsightsPage />} />
+          <Route path="/forecast" element={<ForecastPage />} />
+          <Route path="/assistant" element={<AssistantPage />} />
+          <Route path="/sandbox" element={<SandboxPage />} />
+          <Route path="/goals" element={<GoalsPage />} />
+          <Route path="/data" element={<DataCenterPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </AppShell>
       <Toast />
     </>
