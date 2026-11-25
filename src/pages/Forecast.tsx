@@ -9,6 +9,7 @@ import { formatMoneyShort } from '../domain/money';
 import { EChart } from '../components/Chart';
 import { Badge, Button, Card, InfoNote, Money, PageHeader, Segmented, StatCard, cn } from '../components/ui';
 import { dueLabel, riskText, weekdayCN } from '../lib/ui';
+import { cssColor } from '../theme/palette';
 
 const SOURCE_LABEL: Record<string, string> = {
   weekday: '同星期中位数',
@@ -86,14 +87,14 @@ export function ForecastPage() {
           smooth: 0.22,
           showSymbol: false,
           data: chartDays.map((d) => d.balance),
-          lineStyle: { width: 2.2, color: '#0E7568' },
+          lineStyle: { width: 2.2, color: cssColor('--accent', '#0e7568') },
           areaStyle: {
             color: {
               type: 'linear',
               x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(14,117,104,0.2)' },
-                { offset: 1, color: 'rgba(14,117,104,0.01)' },
+                { offset: 0, color: `rgba(${cssColor('--accent-rgb', '14, 117, 104')},0.2)` },
+                { offset: 1, color: `rgba(${cssColor('--accent-rgb', '14, 117, 104')},0.01)` },
               ],
             },
           },
@@ -188,7 +189,7 @@ export function ForecastPage() {
         </Card>
 
         <div className="space-y-4">
-          <Card className="rise" style={{ '--i': 1 } as CSSProperties} title="今日待付 / 待收" subtitle="逾期支出按今日计入；逾期收入不默认到账" action={<Link to="/schedules" className="text-[11.5px] font-semibold text-[#0B6357] hover:underline">处理</Link>}>
+          <Card className="rise" style={{ '--i': 1 } as CSSProperties} title="今日待付 / 待收" subtitle="逾期支出按今日计入；逾期收入不默认到账" action={<Link to="/schedules" className="text-[11.5px] font-semibold text-[var(--accent-ink)] hover:underline">处理</Link>}>
             {todayItems.length === 0 ? (
               <p className="text-[12px] text-[#8A887F]">今天没有待处理的固定计划。</p>
             ) : (
@@ -199,7 +200,7 @@ export function ForecastPage() {
                       <p className="font-medium">{v.flow.title}</p>
                       <p className="text-[10.5px] text-[#8A887F]">{v.overdue ? dueLabel(v.daysUntilDue) : '今天'} · {v.flow.kind === 'income' ? '收入' : '支出'}</p>
                     </div>
-                    <Money cents={v.amount} className={cn('font-semibold', v.flow.kind === 'income' && 'text-[#0B6357]')} />
+                    <Money cents={v.amount} className={cn('font-semibold', v.flow.kind === 'income' && 'text-[var(--accent-ink)]')} />
                   </li>
                 ))}
               </ul>
@@ -216,7 +217,7 @@ export function ForecastPage() {
                     <p className="text-[10px] text-[#8A887F]">{weekdayCN(w)}</p>
                     <p className="num mt-1 text-[11px] font-semibold">{stat?.median === null || stat?.median === undefined ? '—' : formatMoneyShort(stat.median)}</p>
                     <p className="mt-0.5 text-[9.5px] text-[#A3A097]">{stat?.samples ?? 0} 样本</p>
-                    {bias !== 0 && <p className={cn('num text-[9px]', bias > 0 ? 'text-[#98362E]' : 'text-[#0B6357]')}>{bias > 0 ? '+' : ''}{formatMoneyShort(bias)}</p>}
+                    {bias !== 0 && <p className={cn('num text-[9px]', bias > 0 ? 'text-[#98362E]' : 'text-[var(--accent-ink)]')}>{bias > 0 ? '+' : ''}{formatMoneyShort(bias)}</p>}
                   </div>
                 );
               })}
@@ -241,7 +242,7 @@ export function ForecastPage() {
                 {recent.map((d) => (
                   <tr key={d.date}>
                     <td className="whitespace-nowrap text-[12px]">{formatCN(d.date)}<span className="ml-1 text-[10px] text-[#A3A097]">{weekdayCN(weekdayIndex(d.date))}</span></td>
-                    <td className="num text-right text-[12px] text-[#0B6357]">{d.income ? formatMoneyShort(d.income) : '—'}</td>
+                    <td className="num text-right text-[12px] text-[var(--accent-ink)]">{d.income ? formatMoneyShort(d.income) : '—'}</td>
                     <td className="num text-right text-[12px] text-[#98362E]">{d.fixedExpense ? formatMoneyShort(d.fixedExpense) : '—'}</td>
                     <td className="num text-right text-[12px]">{d.variableEstimate === null ? <span className="text-[#B7791F]">未估计</span> : formatMoneyShort(d.variableEstimate)}<span className="ml-1 text-[9.5px] text-[#A3A097]">{d.variableEstimate !== null ? SOURCE_LABEL[d.variableSource] : ''}</span></td>
                     <td className={cn('num text-right text-[12px] font-semibold', d.balance < dataset.settings.safetyReserve && 'text-[#98362E]')}>{formatMoneyShort(d.balance)}</td>

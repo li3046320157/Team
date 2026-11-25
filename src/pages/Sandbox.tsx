@@ -11,6 +11,7 @@ import { savePlan, deletePlan, type PlanInput } from '../services/mutations';
 import { EChart } from '../components/Chart';
 import { Badge, Button, Card, EmptyState, Field, InfoNote, Money, PageHeader, Switch, cn } from '../components/ui';
 import { amountInputValue, riskText } from '../lib/ui';
+import { cssColor } from '../theme/palette';
 
 const SCENARIO_COLOR: Record<string, string> = {
   baseline: '#8A887F',
@@ -162,8 +163,12 @@ export function SandboxPage() {
         data: byDate(s),
         smooth: 0.2,
         showSymbol: false,
-        lineStyle: { width: s.type === 'staged' ? 2.4 : 1.8, color: SCENARIO_COLOR[s.type], type: s.type === 'staged' ? 'solid' : s.type === 'delayed' ? 'dashed' : 'solid' },
-        itemStyle: { color: SCENARIO_COLOR[s.type] },
+        lineStyle: {
+          width: s.type === 'staged' ? 2.4 : 1.8,
+          color: s.type === 'staged' ? cssColor('--accent', '#0e7568') : SCENARIO_COLOR[s.type],
+          type: s.type === 'staged' ? 'solid' : s.type === 'delayed' ? 'dashed' : 'solid',
+        },
+        itemStyle: { color: s.type === 'staged' ? cssColor('--accent', '#0e7568') : SCENARIO_COLOR[s.type] },
         ...(s.type === 'baseline'
           ? {
               markLine: {

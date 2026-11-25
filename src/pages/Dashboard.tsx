@@ -33,18 +33,19 @@ import { EChart } from '../components/Chart';
 import { Badge, Button, Card, EmptyState, AnimatedMoney, Money, Progress, StatCard, cn } from '../components/ui';
 import { gsap, isReducedMotion, useGSAP } from '../motion/gsap';
 import { dueLabel, monthLabel, riskText } from '../lib/ui';
+import { cssColor } from '../theme/palette';
 
 const FEATURES = [
-  { to: '/', icon: LayoutDashboard, title: '总览', desc: '今天余额、本月收支、今日待办与 90 天风险状态一眼看清。' },
-  { to: '/ledger', icon: List, title: '流水', desc: '表单或一句话速记，收入、支出、转账都记在同一本账。' },
-  { to: '/schedules', icon: Calendar, title: '计划', desc: '房租、订阅等固定收支建成计划，到期一键核销为真实流水。' },
-  { to: '/insights', icon: Sparkles, title: '洞察', desc: '聚合高频小额、标出异常消费，并从历史中识别周期收支。' },
-  { to: '/forecast', icon: LineChart, title: '预测', desc: '滚动预测未来 90 天余额，并明确标注假设、来源与限制。' },
-  { to: '/assistant', icon: Bot, title: 'AI 分析', desc: '自带 API 密钥，让模型基于你的账本摘要给出可执行建议。' },
-  { to: '/sandbox', icon: FlaskConical, title: '决策沙盘', desc: '大额消费前先模拟：立即买、延后买、分阶段买的影响对比。' },
-  { to: '/goals', icon: Target, title: '目标', desc: '为旅行、应急金等目标预留资金，进度与截止日一目了然。' },
-  { to: '/data', icon: Database, title: '数据中心', desc: '备份、恢复、导出 CSV，回看历史快照与校准结果。' },
-  { to: '/settings', icon: SlidersHorizontal, title: '设置', desc: '维护账户、安全储备线与预算，参数即时影响预测。' },
+  { to: '/', icon: LayoutDashboard, title: '总览', desc: '今天余额、本月收支、今日待办与 90 天风险状态一眼看清。', hue: 'var(--tone-blue)' },
+  { to: '/ledger', icon: List, title: '流水', desc: '表单或一句话速记，收入、支出、转账都记在同一本账。', hue: 'var(--tone-teal)' },
+  { to: '/schedules', icon: Calendar, title: '计划', desc: '房租、订阅等固定收支建成计划，到期一键核销为真实流水。', hue: 'var(--tone-amber)' },
+  { to: '/insights', icon: Sparkles, title: '洞察', desc: '聚合高频小额、标出异常消费，并从历史中识别周期收支。', hue: 'var(--tone-violet)' },
+  { to: '/forecast', icon: LineChart, title: '预测', desc: '滚动预测未来 90 天余额，并明确标注假设、来源与限制。', hue: 'var(--tone-cyan)' },
+  { to: '/assistant', icon: Bot, title: 'AI 分析', desc: '自带 API 密钥，让模型基于你的账本摘要给出可执行建议。', hue: 'var(--tone-rose)' },
+  { to: '/sandbox', icon: FlaskConical, title: '决策沙盘', desc: '大额消费前先模拟：立即买、延后买、分阶段买的影响对比。', hue: 'var(--tone-orange)' },
+  { to: '/goals', icon: Target, title: '目标', desc: '为旅行、应急金等目标预留资金，进度与截止日一目了然。', hue: 'var(--tone-green)' },
+  { to: '/data', icon: Database, title: '数据中心', desc: '备份、恢复、导出 CSV，回看历史快照与校准结果。', hue: 'var(--tone-slate)' },
+  { to: '/settings', icon: SlidersHorizontal, title: '设置', desc: '维护账户、安全储备线与预算，参数即时影响预测。', hue: 'var(--tone-stone)' },
 ];
 
 export function DashboardPage() {
@@ -122,7 +123,7 @@ export function DashboardPage() {
           smooth: 0.25,
           showSymbol: false,
           data: chartDays.map((d) => d.balance),
-          lineStyle: { width: 2, color: '#0E7568' },
+          lineStyle: { width: 2, color: cssColor('--accent', '#0e7568') },
           areaStyle: {
             color: {
               type: 'linear',
@@ -131,8 +132,8 @@ export function DashboardPage() {
               x2: 0,
               y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(14,117,104,0.22)' },
-                { offset: 1, color: 'rgba(14,117,104,0.01)' },
+                { offset: 0, color: `rgba(${cssColor('--accent-rgb', '14, 117, 104')},0.22)` },
+                { offset: 1, color: `rgba(${cssColor('--accent-rgb', '14, 117, 104')},0.01)` },
               ],
             },
           },
@@ -179,7 +180,7 @@ export function DashboardPage() {
       <section ref={heroRef} className="card overflow-hidden" data-reveal="none" aria-labelledby="intro-heading">
         <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[1.25fr_0.75fr]">
           <div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#E3F1ED] px-2.5 py-1 text-[10.5px] font-semibold text-[#0B6357]" data-hero-item>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10.5px] font-semibold text-[var(--accent-ink)]" data-hero-item>
               <Sparkles size={12} /> 关于 MoneyFlow 钱流
             </span>
             <h1 id="intro-heading" className="mt-3 text-[25px] font-semibold leading-[1.25] tracking-[-0.02em] sm:text-[30px]" data-hero-item>
@@ -207,10 +208,10 @@ export function DashboardPage() {
           <div className="rounded-2xl border border-[#E9E4DA] bg-[#FAF8F3] p-4" data-hero-item>
             <p className="text-[12px] font-semibold text-[#3A3D37]">推荐使用顺序</p>
             <ol className="mt-2.5 space-y-2 text-[11.5px] leading-relaxed text-[#6B6A63]">
-              <li><span className="num mr-1.5 font-semibold text-[#0B6357]">1</span>建立账户，填写期初余额与安全储备线</li>
-              <li><span className="num mr-1.5 font-semibold text-[#0B6357]">2</span>记录流水，把房租等固定收支建成计划</li>
-              <li><span className="num mr-1.5 font-semibold text-[#0B6357]">3</span>看预测与洞察，用沙盘评估大额消费</li>
-              <li><span className="num mr-1.5 font-semibold text-[#0B6357]">4</span>为目标预留资金，按节奏沉淀储蓄</li>
+              <li><span className="num mr-1.5 font-semibold text-[var(--accent-ink)]">1</span>建立账户，填写期初余额与安全储备线</li>
+              <li><span className="num mr-1.5 font-semibold text-[var(--accent-ink)]">2</span>记录流水，把房租等固定收支建成计划</li>
+              <li><span className="num mr-1.5 font-semibold text-[var(--accent-ink)]">3</span>看预测与洞察，用沙盘评估大额消费</li>
+              <li><span className="num mr-1.5 font-semibold text-[var(--accent-ink)]">4</span>为目标预留资金，按节奏沉淀储蓄</li>
             </ol>
             <p className="mt-3 rounded-lg bg-white/70 px-2.5 py-2 text-[10.5px] leading-relaxed text-[#8A887F]">
               不需要一次填完：先记今天的一笔，系统会随数据逐步校准。
@@ -227,9 +228,10 @@ export function DashboardPage() {
               <li key={feature.title} data-reveal="">
                 <Link
                   to={feature.to}
-                  className="group flex h-full gap-2.5 rounded-xl border border-[#EFECE6] bg-[#FCFBF8] p-3 transition duration-200 hover:-translate-y-0.5 hover:border-[#BFE0D7] hover:bg-[#F7FBF9] hover:shadow-[0_10px_24px_-20px_rgba(14,117,104,0.55)]"
+                  className="group feature-tile flex h-full gap-2.5 rounded-xl border p-3"
+                  style={{ '--tile-hue': feature.hue } as CSSProperties}
                 >
-                  <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#E3F1ED] text-[#0B6357] transition-transform duration-200 group-hover:scale-105">
+                  <span className="feature-icon mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg">
                     <feature.icon size={15} />
                   </span>
                   <span className="min-w-0">
@@ -251,7 +253,7 @@ export function DashboardPage() {
           <h2 className="text-[20px] font-semibold tracking-[-0.01em]">账本速览</h2>
           <p className="mt-1 text-[12px] text-[#8A887F]">{formatCN(today)} · {monthLabel(month)} · 总余额、待办与未来走势</p>
         </div>
-        <Link to="/forecast" className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#0B6357] hover:underline">
+        <Link to="/forecast" className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--accent-ink)] hover:underline">
           查看完整预测 <ChevronRight size={14} />
         </Link>
       </div>
@@ -267,28 +269,28 @@ export function DashboardPage() {
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="总余额" value={<AnimatedMoney id="stat.balance" cents={summary.balance} />} hint={`${dataset.accounts.length} 个账户合计`} />
+            <StatCard label="总余额" value={<AnimatedMoney id="stat.balance" cents={summary.balance} />} hint={`${dataset.accounts.length} 个账户合计`} tone="accent" />
             <StatCard
               label="可用可支配"
               value={<AnimatedMoney id="stat.free" cents={summary.free} />}
               hint={`已扣目标预留 ${formatMoneyShort(summary.reserved)} 与安全储备`}
-              tone={summary.free < 0 ? 'danger' : 'teal'}
+              tone={summary.free < 0 ? 'danger' : 'positive'}
             />
             <StatCard
               label={`${monthLabel(month)}结余`}
               value={<AnimatedMoney id="stat.net" cents={summary.monthStats.net} />}
               hint={
                 <span className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-0.5 text-[#0B6357]"><TrendingUp size={12} />{formatMoneyShort(summary.monthStats.income)}</span>
+                  <span className="inline-flex items-center gap-0.5 text-[var(--tone-green)]"><TrendingUp size={12} />{formatMoneyShort(summary.monthStats.income)}</span>
                   <span className="inline-flex items-center gap-0.5 text-[#98362E]"><TrendingDown size={12} />{formatMoneyShort(summary.monthStats.expense)}</span>
                 </span>
               }
-              tone={summary.monthStats.net >= 0 ? 'teal' : 'amber'}
+              tone={summary.monthStats.net >= 0 ? 'accent2' : 'danger'}
             />
             <StatCard
               label="现金流状态"
               value={
-                <span className={cn('flex items-center gap-2', riskLevel === 'danger' && 'text-[#98362E]', riskLevel === 'warning' && 'text-[#8A5A13]', riskLevel === 'safe' && 'text-[#0B6357]')}>
+                <span className="flex items-center gap-2 text-[var(--stat-ink)]">
                   {riskLevel === 'danger' ? <TrendingDown size={20} /> : riskLevel === 'warning' ? <CalendarClock size={20} /> : <ShieldCheck size={20} />}
                   <span className="text-[19px]">{riskText(riskLevel)}</span>
                 </span>
@@ -300,7 +302,7 @@ export function DashboardPage() {
                     ? `预计 ${formatCN(forecast.risk.firstBelowSafety)} 首次低于安全线`
                     : '90 天预测期内不低于安全线'
               }
-              tone={riskLevel === 'danger' ? 'danger' : riskLevel === 'warning' ? 'amber' : 'default'}
+              tone={riskLevel === 'danger' ? 'danger' : riskLevel === 'warning' ? 'warning' : 'positive'}
             />
           </div>
 
@@ -323,7 +325,7 @@ export function DashboardPage() {
             <Card
               title="未来 30 天余额"
               subtitle="实线为日终预计余额；虚线为安全储备。首版不估计当天新增零散消费。"
-              action={<Link className="text-[12px] font-semibold text-[#0B6357] hover:underline" to="/forecast">90 天详情</Link>}
+              action={<Link className="text-[12px] font-semibold text-[var(--accent-ink)] hover:underline" to="/forecast">90 天详情</Link>}
             >
               <EChart option={option} height={260} ariaLabel="未来 30 天预计余额折线图" />
             </Card>
@@ -337,7 +339,7 @@ export function DashboardPage() {
                 action={summary.tasks.length > 0 ? <Badge tone="amber">{summary.tasks.length} 项</Badge> : <Badge tone="teal">已清</Badge>}
               >
                 {summary.tasks.length === 0 ? (
-                  <div className="flex items-center gap-2 rounded-lg bg-[#F1FAF7] px-3 py-3 text-[12.5px] text-[#0B6357]">
+                  <div className="flex items-center gap-2 rounded-lg bg-[var(--accent-soft)] px-3 py-3 text-[12.5px] text-[var(--accent-ink)]">
                     <CheckCircle2 size={16} /> 今天没有待确认的计划支出或收入。
                   </div>
                 ) : (
@@ -351,14 +353,14 @@ export function DashboardPage() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Money cents={task.amount} className={cn('text-[13px] font-semibold', task.flow.kind === 'income' ? 'text-[#0B6357]' : '')} />
+                          <Money cents={task.amount} className={cn('text-[13px] font-semibold', task.flow.kind === 'income' ? 'text-[var(--accent-ink)]' : '')} />
                           <Button size="xs" variant="secondary" onClick={() => navigate('/schedules')}>处理</Button>
                         </div>
                       </li>
                     ))}
                     {summary.tasks.length > 4 && (
                       <li className="pt-1 text-center">
-                        <Link to="/schedules" className="text-[11.5px] font-medium text-[#0B6357] hover:underline">其余 {summary.tasks.length - 4} 项</Link>
+                        <Link to="/schedules" className="text-[11.5px] font-medium text-[var(--accent-ink)] hover:underline">其余 {summary.tasks.length - 4} 项</Link>
                       </li>
                     )}
                   </ul>
@@ -381,7 +383,7 @@ export function DashboardPage() {
                             <p className="text-[10.5px] text-[#8A887F]">{dueLabel(view.daysUntilDue)}</p>
                           </div>
                         </div>
-                        <Money cents={view.amount} className={cn('shrink-0 text-[12.5px] font-semibold', view.flow.kind === 'income' ? 'text-[#0B6357]' : '')} />
+                        <Money cents={view.amount} className={cn('shrink-0 text-[12.5px] font-semibold', view.flow.kind === 'income' ? 'text-[var(--accent-ink)]' : '')} />
                       </li>
                     ))}
                   </ul>
@@ -396,7 +398,7 @@ export function DashboardPage() {
               style={{ '--i': 0 } as CSSProperties}
               title="目标进度"
               subtitle="目标预留是可自由支配金额的 earmark，不改变账户余额"
-              action={<Link to="/goals" className="text-[12px] font-semibold text-[#0B6357] hover:underline">管理目标</Link>}
+              action={<Link to="/goals" className="text-[12px] font-semibold text-[var(--accent-ink)] hover:underline">管理目标</Link>}
             >
               {summary.goals.length === 0 ? (
                 <p className="text-[12px] text-[#8A887F]">还没有储蓄目标。</p>
@@ -406,7 +408,7 @@ export function DashboardPage() {
                     <li key={g.goal.id}>
                       <div className="mb-1.5 flex items-center justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-2">
-                          <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#E3F1ED] text-[#0B6357]"><Wallet size={14} /></span>
+                          <span className="grid h-7 w-7 place-items-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-ink)]"><Wallet size={14} /></span>
                           <span className="truncate text-[13px] font-medium">{g.goal.name}</span>
                           {g.status === 'overdue' && <Badge tone="danger">逾期</Badge>}
                         </div>

@@ -263,7 +263,7 @@ export function SchedulesPage() {
             }
           >
             {todo.length === 0 ? (
-              <div className="flex items-center gap-2 rounded-lg bg-[#F1FAF7] px-3 py-3 text-[12.5px] text-[#0B6357]">
+              <div className="flex items-center gap-2 rounded-lg bg-[var(--accent-soft)] px-3 py-3 text-[12.5px] text-[var(--accent-ink)]">
                 <Check size={16} /> 没有到期计划，保持记录即可。
               </div>
             ) : (
@@ -279,7 +279,7 @@ export function SchedulesPage() {
                     style={{ '--d': `${Math.min(i, 7) * 24}ms` } as CSSProperties}
                   >
                     <div className="flex items-start gap-2.5">
-                      <span className={cn('mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg', view.flow.kind === 'income' ? 'bg-[#E3F1ED] text-[#0B6357]' : 'bg-[#F8E7E4] text-[#98362E]')}>
+                      <span className={cn('mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg', view.flow.kind === 'income' ? 'bg-[var(--accent-soft)] text-[var(--accent-ink)]' : 'bg-[#F8E7E4] text-[#98362E]')}>
                         {view.overdue ? <TriangleAlert size={15} /> : <Clock size={15} />}
                       </span>
                       <div>
@@ -346,7 +346,7 @@ export function SchedulesPage() {
                     style={{ '--d': `${Math.min(i, 7) * 24}ms` } as CSSProperties}
                   >
                     <span className="flex items-center gap-2">
-                      <span className={cn('grid h-6 w-6 place-items-center rounded-md', view.status === 'settled' ? 'bg-[#E3F1ED] text-[#0B6357]' : 'bg-[#F0EDE6] text-[#8A887F]')}>
+                      <span className={cn('grid h-6 w-6 place-items-center rounded-md', view.status === 'settled' ? 'bg-[var(--accent-soft)] text-[var(--accent-ink)]' : 'bg-[#F0EDE6] text-[#8A887F]')}>
                         {view.status === 'settled' ? <Check size={12} /> : <SkipForward size={12} />}
                       </span>
                       {view.flow.title} · {formatCN(view.originalDueDate)}

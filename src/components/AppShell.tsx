@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Bot,
@@ -25,16 +25,16 @@ import { usePageReveal } from '../motion/usePageReveal';
 import { cn } from './ui';
 
 const NAV = [
-  { to: '/', label: '总览', icon: LayoutDashboard },
-  { to: '/ledger', label: '流水', icon: List },
-  { to: '/schedules', label: '计划', icon: Calendar },
-  { to: '/insights', label: '洞察', icon: Sparkles },
-  { to: '/forecast', label: '预测', icon: LineChart },
-  { to: '/assistant', label: 'AI 分析', icon: Bot },
-  { to: '/sandbox', label: '决策沙盘', icon: FlaskConical },
-  { to: '/goals', label: '目标', icon: Target },
-  { to: '/data', label: '数据中心', icon: Database },
-  { to: '/settings', label: '设置', icon: Settings },
+  { to: '/', label: '总览', icon: LayoutDashboard, hue: 'var(--tone-blue)' },
+  { to: '/ledger', label: '流水', icon: List, hue: 'var(--tone-teal)' },
+  { to: '/schedules', label: '计划', icon: Calendar, hue: 'var(--tone-amber)' },
+  { to: '/insights', label: '洞察', icon: Sparkles, hue: 'var(--tone-violet)' },
+  { to: '/forecast', label: '预测', icon: LineChart, hue: 'var(--tone-cyan)' },
+  { to: '/assistant', label: 'AI 分析', icon: Bot, hue: 'var(--tone-rose)' },
+  { to: '/sandbox', label: '决策沙盘', icon: FlaskConical, hue: 'var(--tone-orange)' },
+  { to: '/goals', label: '目标', icon: Target, hue: 'var(--tone-green)' },
+  { to: '/data', label: '数据中心', icon: Database, hue: 'var(--tone-slate)' },
+  { to: '/settings', label: '设置', icon: Settings, hue: 'var(--tone-stone)' },
 ];
 
 const MOBILE_PRIMARY = NAV.filter((n) => ['/', '/ledger', '/forecast', '/goals'].includes(n.to));
@@ -43,7 +43,7 @@ const MOBILE_MORE = NAV.filter((n) => !['/', '/ledger', '/forecast', '/goals'].i
 function Brand() {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="grid h-9 w-9 place-items-center rounded-[11px] bg-[#0E7568] text-[17px] font-bold text-white shadow-[0_8px_18px_-10px_rgba(14,117,104,0.9)]">¥</div>
+      <div className="brand-mark grid h-9 w-9 place-items-center rounded-[11px] text-[17px] font-bold text-white">¥</div>
       <div>
         <p className="text-[15px] font-semibold leading-none tracking-tight">MoneyFlow</p>
         <p className="mt-1 text-[10.5px] font-medium tracking-[0.16em] text-[#8A887F]">钱流 · 本地账本</p>
@@ -88,7 +88,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Brand />
         <nav className="mt-7 flex flex-1 flex-col gap-0.5" aria-label="主导航">
           {NAV.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => cn('nav-link', isActive && 'active')}>
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === '/'}
+              className={({ isActive }) => cn('nav-link', isActive && 'active')}
+              style={{ '--nav-hue': item.hue } as CSSProperties}
+            >
               <item.icon size={16} strokeWidth={1.9} />
               {item.label}
             </NavLink>
@@ -98,7 +104,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {user && (
             <div className="flex items-center justify-between gap-2 rounded-xl border border-[#E4E0D8] bg-white px-3 py-2.5" data-testid="user-chip">
               <div className="flex min-w-0 items-center gap-2">
-                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#E3F1ED] text-[#0B6357]"><UserRound size={14} /></div>
+                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-ink)]"><UserRound size={14} /></div>
                 <span className="truncate text-[12px] font-semibold text-[#3A3D37]">{user.username}</span>
               </div>
               <button type="button" className="btn btn-ghost btn-xs shrink-0" onClick={logout} aria-label="退出登录" data-testid="logout">
@@ -137,7 +143,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               key={item.to}
               to={item.to}
               end={item.to === '/'}
-              className={({ isActive }) => cn('flex flex-col items-center gap-1 py-2.5 text-[10.5px]', isActive ? 'text-[#0B6357]' : 'text-[#7A786F]')}
+              className={({ isActive }) => cn('flex flex-col items-center gap-1 py-2.5 text-[10.5px]', isActive ? 'text-[var(--accent-ink)]' : 'text-[#7A786F]')}
             >
               <item.icon size={19} strokeWidth={1.9} />
               {item.label}
@@ -171,7 +177,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     navigate(item.to);
                   }}
                 >
-                  <item.icon size={16} className="text-[#0B6357]" />
+                  <item.icon size={16} className="text-[var(--nav-hue,var(--accent))]" />
                   {item.label}
                 </button>
               ))}
@@ -194,7 +200,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {user && (
               <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-[#E4E0D8] bg-[#FAF8F3] px-3 py-2.5">
                 <div className="flex min-w-0 items-center gap-2">
-                  <UserRound size={15} className="shrink-0 text-[#0B6357]" />
+                  <UserRound size={15} className="shrink-0 text-[var(--accent-ink)]" />
                   <span className="truncate text-[12.5px] font-semibold">{user.username}</span>
                 </div>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setMoreOpen(false); logout(); }}>
