@@ -1,12 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ANALYSIS_SYSTEM_PROMPT,
+  aiChatKey,
   buildAnalysisContext,
   chatEndpoint,
+  clearAiChat,
   createSseParser,
+  loadAiChat,
   maskKey,
   modelsEndpoint,
   normalizeApiBase,
+  saveAiChat,
   validateAiConfig,
   type AiConfig,
 } from '../../src/services/ai';
@@ -87,10 +91,16 @@ describe('账本分析上下文', () => {
     goalEvents: [makeGoalEvent()],
   });
 
-  it('包含余额、预测、目标与固定计划摘要', () => {
+  it('包含余额、周期统计、预测、目标与固定计划摘要', () => {
     const text = buildAnalysisContext(dataset, 'personal');
     expect(text).toContain('用户个人账本');
     expect(text).toContain('总余额');
+    expect(text).toContain('统计周期：日/周/月/年');
+    expect(text).toContain('今日（');
+    expect(text).toContain('本周（');
+    expect(text).toContain('本月（');
+    expect(text).toContain('本年（');
+    expect(text).toContain('近 12 个月');
     expect(text).toContain('未来 90 天预测');
     expect(text).toContain('旅行基金');
     expect(text).toContain('房租');
@@ -100,9 +110,63 @@ describe('账本分析上下文', () => {
     expect(buildAnalysisContext(dataset, 'demo')).toContain('合成示例数据');
   });
 
-  it('系统提示词约束单位、结论先行与非投资建议', () => {
+  it('系统提示词约束周期口径、单位、结论先行与非投资建议', () => {
     expect(ANALYSIS_SYSTEM_PROMPT).toContain('人民币元');
+    expect(ANALYSIS_SYSTEM_PROMPT).toContain('日/周/月/年');
     expect(ANALYSIS_SYSTEM_PROMPT).toContain('先给结论');
     expect(ANALYSIS_SYSTEM_PROMPT).toContain('不构成投资建议');
+  });
+});
+
+describe('对话按登录周期留存', () => {
+  let store: Map<string, string>;
+
+  beforeEach(() => {
+    store = new Map();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('同一账户可恢复对话，且不同账户互相隔离', () => {
+    const messages = [
+      { role: 'user' as const, content: '本月支出结构如何？' },
+      { role: 'assistant' as const, content: '餐饮占比最高，建议…' },
+    ];
+    saveAiChat('u1', messages);
+    expect(loadAiChat('u1')).toEqual(messages);
+    expect(loadAiChat('u2')).toEqual([]);
+    expect(store.has(aiChatKey('u1'))).toBe(true);
+  });
+
+  it('清空、损坏数据与不可用存储都不抛错', () => {
+    store.set(aiChatKey('u1'), '{broken');
+    expect(loadAiChat('u1')).toEqual([]);
+    saveAiChat('u1', []);
+    expect(store.has(aiChatKey('u1'))).toBe(false);
+    clearAiChat('u1');
+    vi.stubGlobal('localStorage', {
+      getItem: () => { throw new Error('blocked'); },
+      setItem: () => { throw new Error('blocked'); },
+      removeItem: () => { throw new Error('blocked'); },
+    });
+    expect(loadAiChat('u1')).toEqual([]);
+    expect(() => saveAiChat('u1', [{ role: 'user', content: 'x' }])).not.toThrow();
+    expect(() => clearAiChat('u1')).not.toThrow();
+  });
+
+  it('过滤非法消息并只保留最近 100 条', () => {
+    const many = Array.from({ length: 120 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: `m${i}` }));
+    store.set(aiChatKey('u1'), JSON.stringify([...many, { role: 'system', content: 'x' }, { role: 'user', content: 1 }]));
+    const loaded = loadAiChat('u1');
+    expect(loaded).toHaveLength(100);
+    expect(loaded[0]?.content).toBe('m20');
+    expect(loaded[99]?.content).toBe('m119');
   });
 });

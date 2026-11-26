@@ -19,6 +19,7 @@ import { personalDbNameFor, type AuthUser, type RegistrationDetails } from '../d
 import { createEmptyDataset } from '../data/defaults';
 import { createDemoDataset } from '../data/sample';
 import { applyCleanSlateOnce, destroyUserLocalData, retireLegacyLocalAuth } from '../data/wipe';
+import { clearAiChat } from '../services/ai';
 import { addAccount, applyOnboarding, type AccountInput } from '../services/mutations';
 import { runCalibrationOnDataset, saveDailySnapshot, saveManualSnapshot, type CalibrationOutcome } from '../services/snapshots';
 
@@ -89,6 +90,7 @@ function setupChannel(): void {
     const state = useAppStore.getState();
     if ((data.uid ?? null) !== (state.user?.id ?? null)) return;
     if (data.deleted) {
+      if (data.uid) clearAiChat(data.uid);
       setPersonalDbName('moneyflow-personal');
       useAppStore.setState({ ...signedOutPatch() });
       state.notify('账号已在其他标签页注销，本机数据已销毁', 'info');
@@ -200,6 +202,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   login: async (identifier, password) => {
     try {
       const user = await apiLogin(identifier, password);
+      // 每次登录开启新的对话周期；接口配置不受影响。
+      clearAiChat(user.id);
       if (user.role === 'admin') {
         setPersonalDbName('moneyflow-personal');
         set({ user, dataset: null, ready: false, loading: false, error: null, authError: null, introPending: false });
@@ -271,6 +275,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       return apiErrorMessage(error, '注销账号失败，请稍后重试');
     }
+    clearAiChat(user.id);
     broadcastDeletion(user.id);
     await new Promise((resolve) => setTimeout(resolve, 250));
     try {
@@ -287,11 +292,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   applyUser: (user) => set({ user }),
 
   logout: async () => {
+    const uid = get().user?.id ?? null;
     try {
       await apiLogout();
     } catch (error) {
       if (error instanceof ApiError && error.code === 'logout_unconfirmed') {
         // 服务端已下发清除 Cookie，但会话撤销未确认；本机仍先退出。
+        if (uid) clearAiChat(uid);
         setPersonalDbName('moneyflow-personal');
         set({ ...signedOutPatch() });
         get().notify('已退出本机登录，服务器会话撤销未确认', 'info');
@@ -301,6 +308,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().notify(message, 'error');
       return message;
     }
+    if (uid) clearAiChat(uid);
     setPersonalDbName('moneyflow-personal');
     set({ ...signedOutPatch() });
     get().notify('已退出登录', 'info');
@@ -501,6 +509,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 setSessionExpiredHandler(() => {
   const state = useAppStore.getState();
   if (!state.user) return;
+  clearAiChat(state.user.id);
   setPersonalDbName('moneyflow-personal');
   useAppStore.setState({ ...signedOutPatch() });
   state.notify('登录已过期，请重新登录', 'error');

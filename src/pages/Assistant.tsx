@@ -6,30 +6,30 @@ import {
   ANALYSIS_SYSTEM_PROMPT,
   AiError,
   buildAnalysisContext,
+  clearAiChat,
   fetchModelList,
+  loadAiChat,
   loadAiConfig,
   maskKey,
+  saveAiChat,
   saveAiConfig,
   streamChat,
   validateAiConfig,
+  type AiChatMessage,
   type AiConfig,
   type ChatMessage,
 } from '../services/ai';
 
 const QUICK_PROMPTS = [
   '分析我的消费结构，指出最值得优化的一项',
+  '对比本周与上周的支出，找出变化最大的类别',
   '未来 90 天有什么现金流风险？如何避免？',
-  '怎样安排才能更快达成储蓄目标？',
-  '本月哪些支出可以省下来？给具体建议',
+  '按近 12 个月趋势，帮我规划接下来 3 个月的储蓄节奏',
 ];
-
-interface UiMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
 
 export function AssistantPage() {
   const user = useAppStore((s) => s.user);
+  const userId = user?.id ?? null;
   const dataset = useAppStore((s) => s.dataset);
   const mode = useAppStore((s) => s.mode);
   const notify = useAppStore((s) => s.notify);
@@ -44,19 +44,19 @@ export function AssistantPage() {
   const [fetchingModels, setFetchingModels] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
 
-  const [messages, setMessages] = useState<UiMessage[]>([]);
+  const [messages, setMessages] = useState<AiChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [leavingIdx, setLeavingIdx] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const messagesRef = useRef<UiMessage[]>(messages);
+  const messagesRef = useRef<AiChatMessage[]>(messages);
   messagesRef.current = messages;
 
   useEffect(() => {
-    if (!user) return;
-    const config = loadAiConfig(user.id);
+    if (!userId) return;
+    const config = loadAiConfig(userId);
     if (config) {
       setBaseUrl(config.baseUrl);
       setApiKey(config.apiKey);
@@ -64,7 +64,30 @@ export function AssistantPage() {
       setSavedConfig(config);
       setConfigOpen(false);
     }
-  }, [user]);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    setMessages(loadAiChat(userId));
+  }, [userId]);
+
+  // 流式输出时合并写入；空对话不落盘，避免挂载瞬间覆盖已保存的会话。
+  useEffect(() => {
+    if (!userId || messages.length === 0) return;
+    const timer = window.setTimeout(() => {
+      if (useAppStore.getState().user?.id === userId) saveAiChat(userId, messages);
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [userId, messages]);
+
+  useEffect(() => {
+    if (!userId) return;
+    return () => {
+      if (messagesRef.current.length > 0 && useAppStore.getState().user?.id === userId) {
+        saveAiChat(userId, messagesRef.current);
+      }
+    };
+  }, [userId]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -183,7 +206,7 @@ export function AssistantPage() {
     <div className="fade-in" data-testid="assistant">
       <PageHeader
         title="AI 智能分析"
-        description="用你自己的 AI 接口解读账本：消费结构、现金流风险、储蓄节奏。对话与密钥只留在本机，请求直接发往你填写的 API 地址。"
+        description="用你自己的 AI 接口解读账本：周期收支、预算执行、消费结构与现金流风险。对话仅保留到退出登录，密钥长期保存在本机，请求直接发往你填写的 API 地址。"
         actions={<Badge tone="teal"><Bot size={11} /> 自带 API</Badge>}
       />
 
@@ -237,7 +260,7 @@ export function AssistantPage() {
                 </Button>
               </div>
               <InfoNote tone="warn">
-                密钥与对话只存本机；分析请求由浏览器直接发往你填写的地址，请确认该服务可信。如果地址没有返回跨域许可（CORS），浏览器会直接拦截请求，网页端无法绕过；请更换支持 CORS 的官方接口或中转，也可以先手动填写模型名保存配置。
+                密钥长期保存在本机，仅在注销账户时删除；对话在退出登录时清除。分析请求由浏览器直接发往你填写的地址，请确认该服务可信。如果地址没有返回跨域许可（CORS），浏览器会直接拦截请求，网页端无法绕过；请更换支持 CORS 的官方接口或中转，也可以先手动填写模型名保存配置。
               </InfoNote>
                 </div>
               ) : (
@@ -258,7 +281,7 @@ export function AssistantPage() {
                 <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-ink)]"><Bot size={22} /></div>
                 <p className="text-[13px] font-semibold text-[#3A3D37]">让 AI 帮你读账本</p>
                 <p className="max-w-sm text-[12px] leading-relaxed text-[#8A887F]">
-                  先配置左侧接口，然后点击下方问题或直接提问。每次提问都会附上当前余额、本月收支、90 天预测与目标进摘要。
+                  先配置左侧接口，然后点击下方问题或直接提问。每次提问都会附上日/周/月/年周期统计、近 12 个月趋势、预算执行、30/90 天预测与目标进摘要。
                 </p>
               </div>
             )}
@@ -325,7 +348,7 @@ export function AssistantPage() {
                 <Send size={14} /> 发送
               </Button>
             )}
-            <Button variant="ghost" onClick={() => { setMessages([]); setChatError(null); }} disabled={streaming || messages.length === 0} aria-label="清空对话" data-testid="chat-clear">
+            <Button variant="ghost" onClick={() => { setMessages([]); setChatError(null); if (userId) clearAiChat(userId); }} disabled={streaming || messages.length === 0} aria-label="清空对话" data-testid="chat-clear">
               <Trash2 size={14} />
             </Button>
           </div>

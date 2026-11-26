@@ -42,11 +42,12 @@ export async function wipeAllLocalData(): Promise<void> {
   await Promise.all([...names].map(deleteDatabase));
 }
 
-/** 注销账户后销毁该账户在本机的专属账本与 AI 配置；设备级配色与动效偏好不受影响。 */
+/** 注销账户后销毁该账户在本机的专属账本、AI 配置与对话；设备级配色与动效偏好不受影响。 */
 export async function destroyUserLocalData(userId: string): Promise<void> {
   closeAllDbs();
   try {
     localStorage.removeItem(`moneyflow.ai.${userId}`);
+    localStorage.removeItem(`moneyflow.ai.chat.${userId}`);
   } catch {
     /* 隐私模式下忽略存储清理失败 */
   }

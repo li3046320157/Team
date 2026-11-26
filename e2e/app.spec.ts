@@ -262,6 +262,67 @@ test('AI 分析：配置校验、保存与连接失败提示', async () => {
   await expect(page.getByTestId('chat-error')).toBeVisible({ timeout: 30_000 });
 });
 
+test('AI 对话：切换页面保留到退出登录，接口配置永久保留', async () => {
+  await page.goto('/#/');
+  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('assistant')).toHaveCount(0);
+  const userId = await page.evaluate(async () => {
+    const factory = indexedDB as IDBFactory & { databases?: () => Promise<{ name?: string }[]> };
+    const list = factory.databases ? await factory.databases() : [];
+    const db = list.map((info) => info.name ?? '').find((name) => name.startsWith('moneyflow-user-'));
+    return db ? db.slice('moneyflow-user-'.length) : '';
+  });
+  expect(userId).toBeTruthy();
+  await page.evaluate((uid) => {
+    localStorage.setItem(`moneyflow.ai.${uid}`, JSON.stringify({
+      baseUrl: 'https://api.example.com/v1',
+      apiKey: 'sk-e2e-fake-key-000000',
+      model: 'e2e-model',
+    }));
+    localStorage.setItem(`moneyflow.ai.chat.${uid}`, JSON.stringify([
+      { role: 'user', content: '上期消费有什么变化？' },
+      { role: 'assistant', content: '本周比上周多花了 120 元，主要来自餐饮。' },
+    ]));
+  }, userId);
+
+  await page.goto('/#/assistant');
+  await page.reload();
+  await expect(page.getByTestId('assistant')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('user-msg')).toContainText('上期消费有什么变化');
+  await expect(page.getByTestId('assistant-msg')).toContainText('本周比上周多花了 120 元');
+
+  await page.getByTestId('book-tab-home').click();
+  await expect(page.getByTestId('dashboard')).toBeVisible();
+  await page.getByTestId('book-tab-assistant').click();
+  await expect(page.getByTestId('assistant')).toBeVisible();
+  await expect(page.getByTestId('user-msg')).toContainText('上期消费有什么变化');
+  await expect(page.getByTestId('assistant-msg')).toContainText('本周比上周多花了 120 元');
+
+  const configBefore = await page.evaluate((uid) => localStorage.getItem(`moneyflow.ai.${uid}`), userId);
+  expect(configBefore).toBeTruthy();
+
+  await page.getByTestId('account-menu').click();
+  await page.getByTestId('logout').click();
+  await expect(page.getByTestId('auth-page')).toBeVisible();
+  const afterLogout = await page.evaluate((uid) => ({
+    chat: localStorage.getItem(`moneyflow.ai.chat.${uid}`),
+    config: localStorage.getItem(`moneyflow.ai.${uid}`),
+  }), userId);
+  expect(afterLogout.chat).toBeNull();
+  expect(afterLogout.config).toBeTruthy();
+
+  await page.getByTestId('auth-username').fill('e2e演示员');
+  await page.getByTestId('auth-password').fill('e2e-pass-123');
+  await page.getByTestId('auth-submit').click();
+  await expect(page.getByTestId('user-chip')).toContainText('e2e演示员', { timeout: 60_000 });
+  await awaitIntro(page);
+  await page.goto('/#/assistant');
+  await expect(page.getByTestId('assistant')).toBeVisible();
+  await expect(page.getByTestId('user-msg')).toHaveCount(0);
+  await expect(page.getByTestId('assistant-msg')).toHaveCount(0);
+  await expect(page.getByText('已配置', { exact: false })).toBeVisible();
+});
+
 test('登录注册：错误密码提示、退出与重新登录', async () => {
   await page.getByTestId('account-menu').click();
   await page.getByTestId('logout').click();
