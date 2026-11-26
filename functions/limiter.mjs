@@ -5,6 +5,7 @@ export const LIMITS = {
   register: { maxAttempts: 5, windowMs: 60 * 60 * 1000 },
   recovery: { maxAttempts: 8, windowMs: 15 * 60 * 1000 },
   admin_credentials: { maxAttempts: 5, windowMs: 15 * 60 * 1000 },
+  delete_account: { maxAttempts: 5, windowMs: 15 * 60 * 1000 },
   usage: { maxAttempts: 30, windowMs: 60 * 1000 },
 };
 

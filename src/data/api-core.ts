@@ -84,6 +84,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_recovery_answer: '找回答案不正确',
   recovery_not_found: '没有找到可自助重置的账户',
   current_password_incorrect: '当前密码不正确',
+  confirmation_mismatch: '用户名确认不匹配，请重新输入',
+  delete_unconfirmed: '账号注销未完成，请稍后重试',
   password_unchanged: '新密码不能与当前密码相同',
   credentials_unchanged: '用户名与密码均未变化',
   login_required: '登录已过期，请重新登录',

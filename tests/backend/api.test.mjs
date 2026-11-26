@@ -461,6 +461,95 @@ test('云端账户与管理员契约', async (t) => {
     assert.equal((await jsonOf(tooShort)).error, 'invalid_recovery');
   });
 
+  await t.test('用户注销账户：双重确认后云端与管理员同步清除，用户名可再次注册', async () => {
+    const registered = await call(app, '/api/register', {
+      method: 'POST',
+      body: {
+        username: 'carol',
+        password: 'carol123',
+        phone: '13700001111',
+        recovery: { question: '我的第一只宠物叫什么名字？', answer: 'coco' },
+      },
+    });
+    assert.equal(registered.status, 201);
+    const carolId = (await jsonOf(registered)).user.id;
+
+    const login = await call(app, '/api/login', {
+      method: 'POST',
+      body: { identifier: 'carol', password: 'carol123' },
+    });
+    assert.equal(login.status, 200);
+    const carolCookie = cookieOf(login);
+    await call(app, '/api/usage/ping', { method: 'POST', cookie: carolCookie });
+
+    const adminAttempt = await call(app, '/api/account/delete', {
+      method: 'POST',
+      cookie: adminCookie,
+      body: { currentPassword: ADMIN_NEW_PASSWORD, confirmUsername: 'ledger-root' },
+    });
+    assert.equal(adminAttempt.status, 403);
+    assert.equal((await jsonOf(adminAttempt)).error, 'forbidden');
+
+    const wrongName = await call(app, '/api/account/delete', {
+      method: 'POST',
+      cookie: carolCookie,
+      body: { currentPassword: 'carol123', confirmUsername: 'carol2' },
+    });
+    assert.equal(wrongName.status, 400);
+    assert.equal((await jsonOf(wrongName)).error, 'confirmation_mismatch');
+
+    const wrongPassword = await call(app, '/api/account/delete', {
+      method: 'POST',
+      cookie: carolCookie,
+      body: { currentPassword: 'not-the-password', confirmUsername: 'carol' },
+    });
+    assert.equal(wrongPassword.status, 400);
+    assert.equal((await jsonOf(wrongPassword)).error, 'current_password_incorrect');
+
+    const detailBefore = await call(app, `/api/admin/users/${carolId}`, { cookie: adminCookie });
+    assert.equal(detailBefore.status, 200);
+
+    const deleted = await call(app, '/api/account/delete', {
+      method: 'POST',
+      cookie: carolCookie,
+      body: { currentPassword: 'carol123', confirmUsername: 'carol' },
+    });
+    assert.equal(deleted.status, 200);
+    assert.equal((await jsonOf(deleted)).ok, true);
+    assert.match(deleted.headers.get('set-cookie'), /Max-Age=0/);
+
+    const stale = await call(app, '/api/me', { cookie: carolCookie });
+    assert.equal(stale.status, 401);
+    const relogin = await call(app, '/api/login', {
+      method: 'POST',
+      body: { identifier: 'carol', password: 'carol123' },
+    });
+    assert.equal(relogin.status, 401);
+
+    const detailGone = await call(app, `/api/admin/users/${carolId}`, { cookie: adminCookie });
+    assert.equal(detailGone.status, 404);
+    const search = await call(app, '/api/admin/users?q=carol', { cookie: adminCookie });
+    assert.equal((await jsonOf(search)).total, 0);
+    const overview = await jsonOf(await call(app, '/api/admin/overview', { cookie: adminCookie }));
+    assert.equal(overview.stats.totalUsers, 2);
+
+    assert.equal(db.rowsOf('users').some((row) => row.id === carolId), false);
+    assert.equal(db.rowsOf('sessions').some((row) => row.user_id === carolId), false);
+    assert.equal(db.rowsOf('usage_daily').some((row) => row.user_id === carolId), false);
+    assert.equal(db.rowsOf('auth_events').some((row) => row.user_id === carolId), false);
+    assert.equal(db.rowsOf('auth_limiter').some((row) => String(row.key).includes(carolId)), false);
+
+    const reRegistered = await call(app, '/api/register', {
+      method: 'POST',
+      body: {
+        username: 'carol',
+        password: 'carol999',
+        recovery: { question: '我的第一只宠物叫什么名字？', answer: 'coco' },
+      },
+    });
+    assert.equal(reRegistered.status, 201);
+  });
+
   await t.test('固定窗口限流按窗口放行与拦截', async () => {
     const now = Date.now();
     for (let index = 0; index < 10; index += 1) {

@@ -142,6 +142,13 @@ export async function apiUpdateRecovery(currentPassword: string, question: strin
   return normalizeUser(data.user);
 }
 
+export async function apiDeleteAccount(currentPassword: string, confirmUsername: string): Promise<void> {
+  await apiRequest<{ ok: boolean }>('/api/account/delete', {
+    method: 'POST',
+    body: { currentPassword, confirmUsername },
+  });
+}
+
 export async function apiPingUsage(): Promise<void> {
   try {
     await apiRequest<{ ok: boolean }>('/api/usage/ping', { method: 'POST', body: {} });

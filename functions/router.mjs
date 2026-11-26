@@ -4,6 +4,7 @@ import {
   bindPhone,
   changePassword,
   currentUser,
+  deleteAccount,
   loginAccount,
   logoutAccount,
   lookupRecovery,
@@ -45,6 +46,7 @@ async function route(db, request, origin, dayForNow) {
   if (method === 'POST' && path === '/api/account/phone') return bindPhone(db, request);
   if (method === 'POST' && path === '/api/account/password') return changePassword(db, request);
   if (method === 'POST' && path === '/api/account/recovery') return updateRecovery(db, request);
+  if (method === 'POST' && path === '/api/account/delete') return deleteAccount(db, request);
   if (method === 'POST' && path === '/api/usage/ping') return pingUsage(db, request, dayForNow);
 
   if (path.startsWith('/api/admin')) {
@@ -56,7 +58,8 @@ async function route(db, request, origin, dayForNow) {
     || path === '/api/login' || path === '/api/logout' || path === '/api/recovery/lookup'
     || path === '/api/recovery/reset' || path === '/api/account/profile'
     || path === '/api/account/phone' || path === '/api/account/password'
-    || path === '/api/account/recovery' || path === '/api/usage/ping') {
+    || path === '/api/account/recovery' || path === '/api/account/delete'
+    || path === '/api/usage/ping') {
     throw new AppError('method_not_allowed', 405);
   }
   throw new AppError('not_found', 404);
