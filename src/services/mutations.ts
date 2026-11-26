@@ -54,7 +54,8 @@ export interface TxnInput {
   nature: TxnNature;
 }
 
-function validateTxnInput(dataset: Dataset, input: TxnInput, today: ISODate): void {
+/** 供账单导入等批量写入复用的统一校验，避免两套规则漂移。 */
+export function validateTxnInput(dataset: Dataset, input: TxnInput, today: ISODate): void {
   ensureAmount(input.amount);
   assert(isValidISODate(input.date), '日期无效');
   assert(input.date <= today, '实际交易不能记录在未来日期，请改用固定计划');

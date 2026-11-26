@@ -2532,6 +2532,17 @@ table.data tbody tr:hover {
   font-family: var(--font-ledger);
   letter-spacing: 0.06em;
 }
+.book-desk-chip.is-demo {
+  border-color: #ecd9b4;
+  background: #fbf3e3;
+  color: #8a5a12;
+  cursor: pointer;
+  font-weight: 600;
+}
+.book-desk-chip.is-demo:hover {
+  border-color: #dfc08b;
+  background: #f7ead2;
+}
 
 .book-desk {
   position: relative;

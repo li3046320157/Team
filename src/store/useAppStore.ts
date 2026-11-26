@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import type { Dataset, DataMode } from '../domain/types';
 import { todayISO } from '../domain/days';
-import { clearDataset, describeDbError, readDataset, writeDataset, setPersonalDbName } from '../data/db';
+import { clearDataset, describeDbError, readDataset, writeDataset, setPersonalDbName, setDemoDbName } from '../data/db';
 import {
   apiBindPhone,
   apiChangePassword,
@@ -17,6 +17,7 @@ import {
 import { ApiError, apiErrorMessage, setSessionExpiredHandler } from '../data/api-core';
 import { personalDbNameFor, type AuthUser, type RegistrationDetails } from '../data/auth';
 import { createEmptyDataset } from '../data/defaults';
+import { createDemoDataset } from '../data/sample';
 import { applyCleanSlateOnce, destroyUserLocalData, retireLegacyLocalAuth } from '../data/wipe';
 import { addAccount, applyOnboarding, type AccountInput } from '../services/mutations';
 import { runCalibrationOnDataset, saveDailySnapshot, saveManualSnapshot, type CalibrationOutcome } from '../services/snapshots';
@@ -65,6 +66,9 @@ interface AppState {
   runCalibration: () => Promise<CalibrationOutcome | null>;
   makeSnapshot: () => Promise<boolean>;
   resetMode: (mode: DataMode) => Promise<void>;
+  enterDemo: () => Promise<boolean>;
+  exitDemo: () => Promise<boolean>;
+  regenerateDemo: () => Promise<boolean>;
   notify: (text: string, kind?: ToastKind) => void;
   clearToast: () => void;
   dismissError: () => void;
@@ -430,6 +434,53 @@ export const useAppStore = create<AppState>((set, get) => ({
       broadcast(mode);
     } catch (error) {
       get().notify(describeDbError(error), 'error');
+    }
+  },
+
+  enterDemo: async () => {
+    const state = get();
+    if (!state.user) return false;
+    try {
+      setDemoDbName(`moneyflow-demo-${state.user.id}`);
+      const today = todayISO();
+      let dataset = await readDataset('demo');
+      if (!dataset || dataset.meta.demoDate !== today) {
+        const fresh = createDemoDataset(today);
+        await withWriteLock('demo', () => writeDataset('demo', fresh));
+        dataset = fresh;
+      }
+      set({ mode: 'demo', dataset, ready: true, error: null });
+      broadcast('demo');
+      get().notify('已进入示例账本，示例数据不会影响你的个人账本', 'success');
+      return true;
+    } catch (error) {
+      get().notify(describeDbError(error), 'error');
+      return false;
+    }
+  },
+
+  exitDemo: async () => {
+    const state = get();
+    if (!state.user) return false;
+    setDemoDbName(`moneyflow-demo-${state.user.id}`);
+    setPersonalDbName(personalDbNameFor(state.user.id));
+    set({ mode: 'personal' });
+    await get().init();
+    return true;
+  },
+
+  regenerateDemo: async () => {
+    try {
+      await clearDataset('demo');
+      const dataset = createDemoDataset(todayISO());
+      await withWriteLock('demo', () => writeDataset('demo', dataset));
+      set({ dataset, error: null });
+      broadcast('demo');
+      get().notify('示例数据已重新生成', 'success');
+      return true;
+    } catch (error) {
+      get().notify(describeDbError(error), 'error');
+      return false;
     }
   },
 

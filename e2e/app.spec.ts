@@ -1,4 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import path from 'node:path';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -224,7 +225,7 @@ test('目标：创建目标并从自由余额预留', async () => {
 test('数据中心：损坏的备份文件必须在写入前被拒绝', async () => {
   await page.goto('/#/data');
   await expect(page.getByTestId('data-center')).toBeVisible();
-  await page.locator('input[type="file"]').setInputFiles({
+  await page.locator('input[type="file"][accept*="json"]').setInputFiles({
     name: 'broken.json',
     mimeType: 'application/json',
     buffer: Buffer.from('{ this is not a backup'),
@@ -494,6 +495,25 @@ test('移动端：账本翻页栏与目录抽屉可进入计划页', async ({ br
   await mobile.close();
 });
 
+test('账单导入：选支付宝 CSV → 预览新增 5 笔 → 确认后流水页见商户', async () => {
+  await page.goto('/#/data');
+  await expect(page.getByTestId('data-center')).toBeVisible();
+  await page.getByTestId('import-bill-file').setInputFiles(path.resolve('tests', 'fixtures', 'bills', 'alipay-utf8.csv'));
+  await expect(page.getByTestId('bill-mapping')).toBeVisible();
+  await expect(page.getByTestId('bill-mapping').getByText('支付宝')).toBeVisible();
+  await expect(page.getByTestId('bill-account')).toHaveValue(/^acc_/);
+  await page.getByTestId('bill-build-plan').click();
+  await expect(page.getByTestId('bill-preview')).toBeVisible();
+  await expect(page.getByText('新增 5 笔')).toBeVisible();
+  await expect(page.getByText('跳过 3 笔')).toBeVisible();
+  await page.getByTestId('bill-import-confirm').click();
+  await expect(page.getByRole('status')).toContainText('已导入 5 笔，跳过 3 笔');
+  await page.goto('/#/ledger');
+  await expect(page.getByTestId('ledger')).toBeVisible();
+  await expect(page.getByText('美团外卖').first()).toBeVisible();
+  await expect(page.getByText('瑞幸咖啡,望京店').first()).toBeVisible();
+});
+
 test('到期提醒：逾期计划出现导航徽标，设置可开启提醒并导出 .ics', async () => {
   await page.goto('/#/schedules');
   await expect(page.getByTestId('schedules')).toBeVisible();
@@ -534,4 +554,39 @@ test('数据不足：新开户未登记覆盖区间时预测与沙盘显示数�
   await expect(ownPage.getByTestId('sandbox')).toBeVisible();
   await expect(ownPage.getByText('历史数据不足，四种路径只反映支出结构差异，不能当作安全结论')).toBeVisible();
   await own.close();
+});
+
+test('示例数据：新用户先进示例，退出后回到引导页', async ({ browser }) => {
+  const demo = await browser.newContext();
+  const dp = await demo.newPage();
+  await dp.goto('/');
+  await expect(dp.getByTestId('auth-page')).toBeVisible();
+  await skipAuthIntro(dp);
+  await dp.getByTestId('auth-go-register').click();
+  await expect(dp).toHaveURL(/#\/register$/);
+  await expect(dp.getByTestId('auth-confirm')).toBeVisible();
+  await dp.getByTestId('auth-username').fill('e2e示例员');
+  await dp.getByTestId('auth-password').fill('e2e-pass-123');
+  await dp.getByTestId('auth-confirm').fill('e2e-pass-123');
+  await dp.getByTestId('auth-recovery-question').selectOption({ label: '我的第一只宠物叫什么名字？' });
+  await dp.getByTestId('auth-recovery-answer').fill('e2e小猫');
+  await dp.getByTestId('auth-submit').click();
+  await expect(dp).toHaveURL(/#\/login$/);
+  await expect(dp.getByTestId('auth-registered-note')).toBeVisible();
+  await dp.getByTestId('auth-username').fill('e2e示例员');
+  await dp.getByTestId('auth-password').fill('e2e-pass-123');
+  await dp.getByTestId('auth-submit').click();
+  await expect(dp.getByRole('button', { name: '开始记账' })).toBeVisible({ timeout: 60_000 });
+
+  await dp.getByTestId('start-demo').click();
+  await expect(dp.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
+  await expect(dp.getByText('当前为 6 个月合成示例数据，所有操作不会写入你的个人账本。')).toBeVisible();
+  await expect(dp.getByTestId('exit-demo')).toBeVisible();
+
+  await dp.getByTestId('exit-demo').click();
+  await expect(dp.getByRole('button', { name: '开始记账' })).toBeVisible({ timeout: 60_000 });
+  await expect(dp.getByTestId('dashboard')).toHaveCount(0);
+  await expect(dp.getByTestId('start-demo')).toBeVisible();
+  await demo.close();
+});
 });

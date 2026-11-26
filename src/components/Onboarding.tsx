@@ -7,6 +7,7 @@ import { Button, Field } from './ui';
 
 export function Onboarding() {
   const complete = useAppStore((s) => s.completeOnboarding);
+  const enterDemo = useAppStore((s) => s.enterDemo);
   const loading = useAppStore((s) => s.loading);
   const [accountName, setAccountName] = useState('');
   const [opening, setOpening] = useState('');
@@ -108,8 +109,11 @@ export function Onboarding() {
               {saving ? '正在建立…' : '开始记账'}
               {!saving && <ArrowRight size={15} />}
             </Button>
+            <Button variant="secondary" className="w-full" onClick={() => void enterDemo()} data-testid="start-demo">
+              先看 6 个月示例数据
+            </Button>
             <p className="text-center text-[10.5px] leading-relaxed text-[#A3A097]">
-              建立后可在「流水」页记账，在「设置」页随时调整账户与安全线。
+              示例完全合成，与你的个人账本分开保存；随时可退出。
             </p>
           </div>
         </div>

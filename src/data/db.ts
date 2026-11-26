@@ -65,6 +65,7 @@ class MoneyFlowDB extends Dexie {
 
 const LEGACY_PERSONAL_DB = 'moneyflow-personal';
 let personalDbName = LEGACY_PERSONAL_DB;
+let demoDbName = 'moneyflow-demo';
 const dbs: Record<DataMode, MoneyFlowDB | null> = { personal: null, demo: null };
 
 /** 登录后把个人库指向该用户专属数据库；切换时关闭旧连接。 */
@@ -75,9 +76,17 @@ export function setPersonalDbName(name: string): void {
   personalDbName = name;
 }
 
+/** 进入示例前把演示库指向当前用户专属数据库；切换时关闭旧连接。 */
+export function setDemoDbName(name: string): void {
+  if (name === demoDbName) return;
+  dbs.demo?.close();
+  dbs.demo = null;
+  demoDbName = name;
+}
+
 function dbFor(mode: DataMode): MoneyFlowDB {
   if (!dbs[mode]) {
-    dbs[mode] = new MoneyFlowDB(mode === 'personal' ? personalDbName : 'moneyflow-demo');
+    dbs[mode] = new MoneyFlowDB(mode === 'personal' ? personalDbName : demoDbName);
   }
   return dbs[mode] as MoneyFlowDB;
 }

@@ -141,6 +141,8 @@ const FEATURES = [
 
 export function DashboardPage() {
   const dataset = useAppStore((s) => s.dataset)!;
+  const mode = useAppStore((s) => s.mode);
+  const exitDemo = useAppStore((s) => s.exitDemo);
   const navigate = useNavigate();
   const today = todayISO();
   const month = today.slice(0, 7);
@@ -364,6 +366,18 @@ export function DashboardPage() {
       <div className="mt-4" data-reveal="">
         <Marquee items={marqueeItems} speed={34} label="账本关键数字滚动摘要" />
       </div>
+
+      {mode === 'demo' && (
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#F0DFC0] bg-[#FBF3E3] px-4 py-3">
+          <p className="flex items-center gap-2 text-[12.5px] font-medium text-[#8A5A16]">
+            <FlaskConical size={15} className="shrink-0" />
+            当前为 6 个月合成示例数据，所有操作不会写入你的个人账本。
+          </p>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => void exitDemo()}>
+            退出示例
+          </button>
+        </div>
+      )}
 
       <div className="mb-3 mt-6 flex flex-wrap items-end justify-between gap-3" data-reveal="">
         <div>

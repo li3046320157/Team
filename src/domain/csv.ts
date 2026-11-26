@@ -50,7 +50,7 @@ export function transactionsToCSV(params: {
       [
         csvCell(t.date),
         csvCell(kindLabel[t.kind] ?? t.kind),
-        centsToYuan(t.amount),
+        csvCell(centsToYuan(t.amount)),
         csvCell(accName.get(t.accountId) ?? ''),
         csvCell(t.toAccountId ? accName.get(t.toAccountId) ?? '' : ''),
         csvCell(t.categoryId ? catName.get(t.categoryId) ?? '' : ''),

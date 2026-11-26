@@ -218,6 +218,7 @@ export function AppShell() {
   const mode = useAppStore((s) => s.mode);
   const dataset = useAppStore((s) => s.dataset);
   const introPending = useAppStore((s) => s.introPending);
+  const exitDemo = useAppStore((s) => s.exitDemo);
   const [leaves, setLeaves] = useState<LeafState[]>(() => [{ id: 0, location }]);
   const [tocOpen, setTocOpen] = useState(false);
   const leafSeq = useRef(0);
@@ -400,6 +401,16 @@ export function AppShell() {
             账本模式 · 左右翻页
           </span>
           <span className="book-desk-chip is-accent" data-testid="book-page-chip">{pageLabel}</span>
+          {mode === 'demo' && (
+            <button
+              type="button"
+              className="book-desk-chip is-demo"
+              onClick={() => void exitDemo()}
+              data-testid="exit-demo"
+            >
+              示例数据 · 退出
+            </button>
+          )}
         </div>
       </header>
 
