@@ -39,6 +39,8 @@ interface AppState {
   ready: boolean;
   error: string | null;
   toast: Toast | null;
+  introPending: boolean;
+  finishIntro: () => void;
   boot: () => Promise<void>;
   register: (username: string, password: string, details: RegistrationDetails) => Promise<string | null>;
   login: (identifier: string, password: string) => Promise<string | null>;
@@ -118,6 +120,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   ready: false,
   error: null,
   toast: null,
+  introPending: false,
+
+  finishIntro: () => set({ introPending: false }),
 
   boot: async () => {
     await applyCleanSlateOnce();
@@ -143,7 +148,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const user = await loginUser(identifier, password);
       setPersonalDbName(personalDbNameFor(user.id));
       storeSession(user.id);
-      set({ user, error: null });
+      set({ user, error: null, introPending: true });
       await get().init();
       get().notify(`欢迎回来，${user.username}`, 'success');
       return null;
@@ -202,7 +207,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   logout: () => {
     clearSession();
     setPersonalDbName('moneyflow-personal');
-    set({ user: null, dataset: null, ready: false, loading: false, error: null });
+    set({ user: null, dataset: null, ready: false, loading: false, error: null, introPending: false });
     get().notify('已退出登录', 'info');
   },
 

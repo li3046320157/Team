@@ -1,20 +1,10 @@
-import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { HashRouter, Route, Routes } from 'react-router-dom';
 import { useEffect } from 'react';
 import { AppShell } from './components/AppShell';
 import { AuthPage } from './components/AuthPage';
 import { Onboarding } from './components/Onboarding';
 import { Button, Spinner, Toast } from './components/ui';
 import { useAppStore } from './store/useAppStore';
-import { DashboardPage } from './pages/Dashboard';
-import { LedgerPage } from './pages/Ledger';
-import { SchedulesPage } from './pages/Schedules';
-import { InsightsPage } from './pages/Insights';
-import { ForecastPage } from './pages/Forecast';
-import { SandboxPage } from './pages/Sandbox';
-import { GoalsPage } from './pages/Goals';
-import { DataCenterPage } from './pages/DataCenter';
-import { SettingsPage } from './pages/Settings';
-import { AssistantPage } from './pages/Assistant';
 
 function Shell() {
   useEffect(() => {
@@ -39,21 +29,7 @@ function Shell() {
 
   return (
     <>
-      <AppShell>
-        <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/ledger" element={<LedgerPage />} />
-          <Route path="/schedules" element={<SchedulesPage />} />
-          <Route path="/insights" element={<InsightsPage />} />
-          <Route path="/forecast" element={<ForecastPage />} />
-          <Route path="/assistant" element={<AssistantPage />} />
-          <Route path="/sandbox" element={<SandboxPage />} />
-          <Route path="/goals" element={<GoalsPage />} />
-          <Route path="/data" element={<DataCenterPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AppShell>
+      <AppShell />
       <Toast />
     </>
   );

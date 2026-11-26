@@ -5,6 +5,11 @@ test.describe.configure({ mode: 'serial' });
 let context: BrowserContext;
 let page: Page;
 
+async function awaitIntro(target: Page) {
+  await expect(target.getByTestId('ledger-intro')).toBeVisible({ timeout: 15_000 });
+  await expect(target.getByTestId('ledger-intro')).toBeHidden({ timeout: 20_000 });
+}
+
 async function loadApp(target: Page, username = 'e2e演示员', phone?: string) {
   await target.goto('/');
   await expect(target.getByTestId('auth-page')).toBeVisible();
@@ -30,6 +35,7 @@ async function loadApp(target: Page, username = 'e2e演示员', phone?: string) 
   await target.getByPlaceholder('例如：5000').fill('1000');
   await target.getByRole('button', { name: '开始记账' }).click();
   await expect(target.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
+  await awaitIntro(target);
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -61,6 +67,42 @@ test('总览：切换日、月、年现金流视图', async () => {
   await expect(page.getByText('近 5 年收支趋势')).toBeVisible();
   await page.getByRole('button', { name: '月', exact: true }).click();
   await expect(page.getByText('本月结余')).toBeVisible();
+});
+
+test('账本：右侧索引翻页、页码与上下翻页按钮', async () => {
+  await expect(page.getByTestId('book-tab-home')).toBeVisible();
+  await page.getByTestId('book-tab-ledger').click();
+  await expect(page.getByTestId('ledger')).toBeVisible();
+  await expect(page.getByTestId('book-page-chip')).toContainText('02');
+  await page.getByTestId('book-next').click();
+  await expect(page.getByTestId('schedules')).toBeVisible();
+  await expect(page.getByTestId('book-page-chip')).toContainText('03');
+  await page.getByTestId('book-prev').click();
+  await expect(page.getByTestId('ledger')).toBeVisible();
+  await expect(page.getByTestId('book-page-chip')).toContainText('02');
+  await expect(page.locator('.book-leaf')).toHaveCount(1);
+});
+
+test('账本：滚到底后继续下滑、PageUp/PageDown 均可翻页', async () => {
+  await expect(page.getByTestId('ledger')).toBeVisible();
+  await expect(page.locator('.book-leaf')).toHaveCount(1);
+  const scroll = page.locator('[data-book-scroll]').first();
+  await scroll.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  await page.mouse.move(720, 500);
+  await page.mouse.wheel(0, 420);
+  await expect(page.getByTestId('schedules')).toBeVisible();
+  await expect(page.getByTestId('book-page-chip')).toContainText('03');
+  await expect(page.locator('.book-leaf')).toHaveCount(1);
+  await page.keyboard.press('PageUp');
+  await expect(page.getByTestId('ledger')).toBeVisible();
+  await expect(page.getByTestId('book-page-chip')).toContainText('02');
+  await expect(page.locator('.book-leaf')).toHaveCount(1);
+  await page.keyboard.press('PageDown');
+  await expect(page.getByTestId('schedules')).toBeVisible();
+  await expect(page.locator('.book-leaf')).toHaveCount(1);
+  await page.keyboard.press('PageUp');
+  await expect(page.getByTestId('ledger')).toBeVisible();
+  await expect(page.locator('.book-leaf')).toHaveCount(1);
 });
 
 test('一句话快速记账：解析、确认并写入流水', async () => {
@@ -198,6 +240,7 @@ test('登录注册：错误密码提示、退出与重新登录', async () => {
   await page.getByTestId('auth-password').fill('e2e-pass-123');
   await page.getByTestId('auth-submit').click();
   await expect(page.getByTestId('user-chip')).toContainText('e2e演示员', { timeout: 60_000 });
+  await awaitIntro(page);
   await page.goto('/#/');
   await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
 });
@@ -230,6 +273,7 @@ test('个人资料与密码：改名后自动刷新，改密后退回登录页',
   await ownPage.getByTestId('auth-password').fill('e2e-pass-456');
   await ownPage.getByTestId('auth-submit').click();
   await expect(ownPage.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
+  await awaitIntro(ownPage);
   await expect(ownPage.getByTestId('user-chip')).toContainText('e2e改名员');
   await own.close();
 });
@@ -250,6 +294,7 @@ test('手机号登录与忘记密码：绑定手机号、回答问题重置密�
   await ownPage.getByTestId('auth-password').fill('e2e-pass-123');
   await ownPage.getByTestId('auth-submit').click();
   await expect(ownPage.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
+  await awaitIntro(ownPage);
 
   await ownPage.getByTestId('account-menu').click();
   await ownPage.getByTestId('logout').click();
@@ -269,6 +314,7 @@ test('手机号登录与忘记密码：绑定手机号、回答问题重置密�
   await ownPage.getByTestId('auth-password').fill('e2e-pass-789');
   await ownPage.getByTestId('auth-submit').click();
   await expect(ownPage.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
+  await awaitIntro(ownPage);
   await expect(ownPage.getByTestId('user-chip')).toContainText('e2e安全员');
   await own.close();
 });
@@ -297,7 +343,7 @@ test('清除本机数据后，新注册用户从空账本开始', async () => {
   await expect(page.getByTestId('dashboard')).toHaveCount(0);
 });
 
-test('移动端：底部导航与「更多」抽屉可进入计划页', async ({ browser }) => {
+test('移动端：账本翻页栏与目录抽屉可进入计划页', async ({ browser }) => {
   const mobile = await browser.newContext({
     viewport: { width: 390, height: 844 },
     isMobile: true,
@@ -306,10 +352,11 @@ test('移动端：底部导航与「更多」抽屉可进入计划页', async ({
   });
   const mp = await mobile.newPage();
   await loadApp(mp, 'e2e移动端');
-  await expect(mp.getByRole('navigation', { name: '底部导航' })).toBeVisible();
-  await mp.getByRole('button', { name: '更多', exact: true }).click();
-  await expect(mp.getByText(/更多功能/)).toBeVisible();
-  await mp.getByRole('button', { name: '计划', exact: true }).click();
+  await expect(mp.getByRole('navigation', { name: '账本翻页' })).toBeVisible();
+  await mp.getByTestId('book-toc').click();
+  await expect(mp.getByRole('dialog', { name: '账本目录' })).toBeVisible();
+  await mp.getByTestId('book-toc-schedules').click();
   await expect(mp.getByTestId('schedules')).toBeVisible();
+  await expect(mp.getByTestId('book-page-chip')).toContainText('03');
   await mobile.close();
 });

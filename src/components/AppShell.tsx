@@ -1,32 +1,51 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { Navigate, Route, Routes, useLocation, useNavigate, type Location } from 'react-router-dom';
 import {
+  BookOpen,
   Bot,
   Calendar,
+  ChevronDown,
+  ChevronUp,
   Database,
   FlaskConical,
   LayoutDashboard,
   LineChart,
   List,
-  LogOut,
-  Menu,
-  MoreHorizontal,
   Plus,
+  Settings,
   Sparkles,
   Target,
-  UserRound,
   X,
+  type LucideIcon,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import { ScrollTrigger } from '../motion/gsap';
-import { ScrollProgress } from '../motion/ScrollProgress';
+import { gsap, isReducedMotion, useGSAP } from '../motion/gsap';
 import { usePageReveal } from '../motion/usePageReveal';
 import { AccountMenu } from './AccountMenu';
 import { PageAtmosphere } from './PageAtmosphere';
 import { SectionMascot } from './SectionMascot';
+import { LedgerIntro } from './LedgerIntro';
 import { cn } from './ui';
+import { DashboardPage } from '../pages/Dashboard';
+import { LedgerPage } from '../pages/Ledger';
+import { SchedulesPage } from '../pages/Schedules';
+import { InsightsPage } from '../pages/Insights';
+import { ForecastPage } from '../pages/Forecast';
+import { SandboxPage } from '../pages/Sandbox';
+import { GoalsPage } from '../pages/Goals';
+import { DataCenterPage } from '../pages/DataCenter';
+import { SettingsPage } from '../pages/Settings';
+import { AssistantPage } from '../pages/Assistant';
 
-const NAV = [
+interface BookPage {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  hue: string;
+}
+
+/** 账本正文页顺序：也是上下翻页与右侧索引的次序。 */
+export const BOOK_PAGES: BookPage[] = [
   { to: '/', label: '总览', icon: LayoutDashboard, hue: 'var(--tone-blue)' },
   { to: '/ledger', label: '流水', icon: List, hue: 'var(--tone-teal)' },
   { to: '/schedules', label: '计划', icon: Calendar, hue: 'var(--tone-amber)' },
@@ -38,10 +57,40 @@ const NAV = [
   { to: '/data', label: '数据中心', icon: Database, hue: 'var(--tone-slate)' },
 ];
 
-const SETTINGS_LABEL = '个人设置';
+const SETTINGS_PAGE: BookPage = { to: '/settings', label: '个人设置', icon: Settings, hue: 'var(--tone-stone)' };
+const FLIP_SEQUENCE = [...BOOK_PAGES.map((p) => p.to), SETTINGS_PAGE.to];
 
-const MOBILE_PRIMARY = NAV.filter((n) => ['/', '/ledger', '/forecast', '/goals'].includes(n.to));
-const MOBILE_MORE = NAV.filter((n) => !['/', '/ledger', '/forecast', '/goals'].includes(n.to));
+function pageIndex(pathname: string): number {
+  const index = FLIP_SEQUENCE.indexOf(pathname);
+  return index === -1 ? 0 : index;
+}
+
+function pageMeta(pathname: string): BookPage {
+  if (pathname === SETTINGS_PAGE.to) return SETTINGS_PAGE;
+  return BOOK_PAGES.find((p) => p.to === pathname) ?? BOOK_PAGES[0];
+}
+
+function tabSlug(pathname: string): string {
+  return pathname === '/' ? 'home' : pathname.replace(/^\//, '');
+}
+
+function BookRoutes({ location }: { location: Location }) {
+  return (
+    <Routes location={location}>
+      <Route path="/" element={<DashboardPage />} />
+      <Route path="/ledger" element={<LedgerPage />} />
+      <Route path="/schedules" element={<SchedulesPage />} />
+      <Route path="/insights" element={<InsightsPage />} />
+      <Route path="/forecast" element={<ForecastPage />} />
+      <Route path="/assistant" element={<AssistantPage />} />
+      <Route path="/sandbox" element={<SandboxPage />} />
+      <Route path="/goals" element={<GoalsPage />} />
+      <Route path="/data" element={<DataCenterPage />} />
+      <Route path="/settings" element={<SettingsPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
 
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
@@ -55,127 +104,349 @@ function Brand({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
-  const user = useAppStore((s) => s.user);
-  const dataset = useAppStore((s) => s.dataset);
-  const logout = useAppStore((s) => s.logout);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [moreOpen, setMoreOpen] = useState(false);
-  const activeLabel = location.pathname === '/settings'
-    ? SETTINGS_LABEL
-    : NAV.find((n) => n.to === location.pathname)?.label ?? '金钱流水';
-  const pageRef = useRef<HTMLDivElement>(null);
-  const headerRef = useRef<HTMLElement>(null);
+type FlipDirection = 'next' | 'prev';
 
-  usePageReveal(pageRef, location.pathname);
+interface LeafState {
+  id: number;
+  location: Location;
+}
+
+function BookLeaf({
+  leaf,
+  active,
+  onFlip,
+}: {
+  leaf: LeafState;
+  active: boolean;
+  onFlip: (direction: FlipDirection) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  usePageReveal(innerRef, leaf.location.pathname, scrollRef);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => ScrollTrigger.refresh(), 160);
-    return () => window.clearTimeout(timer);
-  }, [dataset]);
-
-  useEffect(() => {
-    const header = headerRef.current;
-    if (!header) return;
-    const trigger = ScrollTrigger.create({
-      start: 8,
-      end: 'max',
-      onToggle: (self) => header.classList.toggle('is-scrolled', self.isActive),
-    });
-    return () => trigger.kill();
-  }, []);
+    const el = scrollRef.current;
+    if (!el || !active) return;
+    if (window.matchMedia('(pointer: coarse)').matches) return;
+    let acc = 0;
+    let lastFlip = 0;
+    let resetTimer = 0;
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      const atTop = el.scrollTop <= 1;
+      const atBottom = el.scrollHeight - el.clientHeight <= 4 || el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
+      const now = performance.now();
+      if (event.deltaY > 0 && atBottom) acc = Math.max(0, acc) + event.deltaY;
+      else if (event.deltaY < 0 && atTop) acc = Math.min(0, acc) + event.deltaY;
+      else acc = 0;
+      if (Math.abs(acc) > 360 && now - lastFlip > 900) {
+        lastFlip = now;
+        const direction: FlipDirection = acc > 0 ? 'next' : 'prev';
+        acc = 0;
+        onFlip(direction);
+      }
+      window.clearTimeout(resetTimer);
+      resetTimer = window.setTimeout(() => { acc = 0; }, 520);
+    };
+    el.addEventListener('wheel', onWheel, { passive: true });
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      window.clearTimeout(resetTimer);
+    };
+  }, [active, onFlip, scrollRef]);
 
   return (
-    <div className="min-h-screen">
-      <ScrollProgress />
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] flex-col border-r border-[#E7E3DA] bg-[#FBF9F4]/90 px-4 py-5 backdrop-blur lg:flex">
-        <Brand />
-        <AccountMenu />
-        <nav className="mt-4 flex flex-1 flex-col gap-0.5" aria-label="主导航">
-          {NAV.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              className={({ isActive }) => cn('nav-link', isActive && 'active')}
-              style={{ '--nav-hue': item.hue } as CSSProperties}
-            >
-              <item.icon size={16} strokeWidth={1.9} />
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="mt-4">
-          <p className="px-1 text-[10.5px] leading-relaxed text-[#A3A097]">
-            整数分计算 · 本地 IndexedDB
-            <br />
-            预测是规划参考，不是收益承诺
-          </p>
+    <article className="book-leaf" data-leaf-id={leaf.id}>
+      <div className="book-leaf-shadow" aria-hidden="true" />
+      <div className="book-leaf-gutter" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+      <div className="book-page-scroll" ref={scrollRef} data-book-scroll>
+        <div ref={innerRef} className="page-motion book-page-inner">
+          <BookRoutes location={leaf.location} />
         </div>
-      </aside>
+      </div>
+    </article>
+  );
+}
 
-      <div className="lg:pl-[232px]">
-        <header ref={headerRef} className="app-header sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-[#E7E3DA] bg-[#F7F5F1]/85 px-3 py-2.5 backdrop-blur sm:px-4 lg:hidden">
-          <div className="flex min-w-0 items-center gap-2">
-            <AccountMenu variant="mobile" />
-            <Brand compact />
+export function AppShell() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const introPending = useAppStore((s) => s.introPending);
+  const [leaves, setLeaves] = useState<LeafState[]>(() => [{ id: 0, location }]);
+  const [tocOpen, setTocOpen] = useState(false);
+  const leafSeq = useRef(0);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const tlRef = useRef<gsap.core.Timeline | null>(null);
+
+  const currentMeta = pageMeta(location.pathname);
+  const isSettings = location.pathname === SETTINGS_PAGE.to;
+  const bookIndex = BOOK_PAGES.findIndex((p) => p.to === location.pathname);
+  const pageLabel = isSettings ? '附录 · 个人设置' : `第 ${String(bookIndex + 1).padStart(2, '0')} / ${String(BOOK_PAGES.length).padStart(2, '0')} 页`;
+  const currentPos = pageIndex(location.pathname);
+  const prevPage = currentPos > 0 ? pageMeta(FLIP_SEQUENCE[currentPos - 1]) : null;
+  const nextPage = currentPos < FLIP_SEQUENCE.length - 1 ? pageMeta(FLIP_SEQUENCE[currentPos + 1]) : null;
+
+  const goTo = useCallback((to: string) => {
+    navigate(to);
+  }, [navigate]);
+
+  const goPrev = useCallback(() => {
+    if (prevPage) goTo(prevPage.to);
+  }, [goTo, prevPage]);
+
+  const goNext = useCallback(() => {
+    if (nextPage) goTo(nextPage.to);
+  }, [goTo, nextPage]);
+
+  const handleFlip = useCallback((direction: FlipDirection) => {
+    if (direction === 'next') goNext();
+    else goPrev();
+  }, [goNext, goPrev]);
+
+  useEffect(() => {
+    setLeaves((prev) => {
+      const last = prev[prev.length - 1];
+      if (last.location.pathname === location.pathname) {
+        if (last.location.search === location.search && last.location.hash === location.hash) return prev;
+        return [...prev.slice(0, -1), { ...last, location }];
+      }
+      const nextLeaf: LeafState = { id: ++leafSeq.current, location };
+      return prev.length > 1 ? [prev[prev.length - 1], nextLeaf] : [...prev, nextLeaf];
+    });
+  }, [location]);
+
+  useLayoutEffect(() => {
+    if (leaves.length < 2) return;
+    const stage = stageRef.current;
+    if (!stage) return;
+    const [from, to] = leaves;
+    const fromEl = stage.querySelector<HTMLElement>(`[data-leaf-id="${from.id}"]`);
+    const toEl = stage.querySelector<HTMLElement>(`[data-leaf-id="${to.id}"]`);
+    if (!fromEl || !toEl) return;
+
+    tlRef.current?.kill();
+    const reduce = isReducedMotion();
+    const settle = () => {
+      stage.style.pointerEvents = '';
+      gsap.set(toEl, { clearProps: 'transform,opacity,zIndex' });
+      setLeaves((prev) => (prev.length > 1 ? [prev[prev.length - 1]] : prev));
+    };
+    stage.style.pointerEvents = 'none';
+
+    if (reduce) {
+      tlRef.current = gsap
+        .timeline({ onComplete: settle })
+        .fromTo(toEl, { opacity: 0 }, { opacity: 1, duration: 0.22, ease: 'power1.out' });
+      return;
+    }
+
+    const forward = pageIndex(to.location.pathname) >= pageIndex(from.location.pathname);
+    const fromShadow = fromEl.querySelector<HTMLElement>('.book-leaf-shadow');
+    const toShadow = toEl.querySelector<HTMLElement>('.book-leaf-shadow');
+
+    if (forward) {
+      gsap.set(toEl, { zIndex: 1, rotateX: 0, y: 18, scale: 0.994, transformOrigin: '50% 0%' });
+      gsap.set(fromEl, { zIndex: 2, rotateX: 0, transformOrigin: '50% 0%' });
+      gsap.set(fromShadow, { opacity: 0 });
+      tlRef.current = gsap
+        .timeline({ onComplete: settle })
+        .to(toEl, { y: 0, scale: 1, duration: 0.8, ease: 'power2.out' }, 0)
+        .to(fromEl, { rotateX: -106, duration: 0.78, ease: 'power2.inOut' }, 0)
+        .to(fromShadow, { opacity: 0.9, duration: 0.5, ease: 'power1.in' }, 0.02)
+        .to(fromEl, { opacity: 0.2, duration: 0.16, ease: 'power1.in' }, 0.62);
+    } else {
+      gsap.set(toEl, { zIndex: 3, rotateX: -106, transformOrigin: '50% 0%' });
+      gsap.set(fromEl, { zIndex: 2, y: 0, scale: 1 });
+      gsap.set(toShadow, { opacity: 0.9 });
+      tlRef.current = gsap
+        .timeline({ onComplete: settle })
+        .to(toEl, { rotateX: 0, duration: 0.8, ease: 'power2.inOut' }, 0)
+        .to(toShadow, { opacity: 0, duration: 0.62, ease: 'power1.out' }, 0.1)
+        .to(fromEl, { y: 10, scale: 0.99, duration: 0.8, ease: 'power2.inOut' }, 0);
+    }
+    return () => {
+      tlRef.current?.kill();
+    };
+  }, [leaves]);
+
+  useGSAP(() => {
+    const shell = shellRef.current;
+    if (!shell || isReducedMotion()) return;
+    const frame = shell.querySelector('.book-frame');
+    const tabs = shell.querySelectorAll('.book-tab');
+    if (frame) {
+      gsap.fromTo(frame, { y: 34, opacity: 0, scale: 0.985 }, { y: 0, opacity: 1, scale: 1, duration: 0.7, ease: 'power3.out', clearProps: 'transform,opacity' });
+    }
+    if (tabs.length) {
+      gsap.fromTo(tabs, { x: 18, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, stagger: 0.035, delay: 0.18, ease: 'power2.out', clearProps: 'transform,opacity' });
+    }
+  }, { scope: shellRef });
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (event.key === 'PageDown') {
+        event.preventDefault();
+        goNext();
+      } else if (event.key === 'PageUp') {
+        event.preventDefault();
+        goPrev();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [goNext, goPrev]);
+
+  useEffect(() => {
+    if (!tocOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setTocOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [tocOpen]);
+
+  return (
+    <div ref={shellRef} className="book-shell">
+      <PageAtmosphere />
+
+      <header className="book-topbar">
+        <div className="book-topbar-left">
+          <div className="hidden lg:block"><Brand /></div>
+          <div className="lg:hidden"><AccountMenu variant="mobile" /></div>
+          <div className="hidden lg:block"><AccountMenu /></div>
+          <div className="book-topbar-brand lg:hidden"><Brand compact /></div>
+        </div>
+        <div className="book-topbar-right">
+          <span className="book-desk-chip hidden sm:inline-flex">
+            <BookOpen size={13} />
+            账本模式 · 上下翻页
+          </span>
+          <span className="book-desk-chip is-accent" data-testid="book-page-chip">{pageLabel}</span>
+        </div>
+      </header>
+
+      <div className="book-desk">
+        <div className="book-frame">
+          <span className="book-corner tl" aria-hidden="true" />
+          <span className="book-corner tr" aria-hidden="true" />
+          <span className="book-corner bl" aria-hidden="true" />
+          <span className="book-corner br" aria-hidden="true" />
+          <span className="book-ribbon" aria-hidden="true" />
+
+          <nav className="book-tabs" aria-label="账本栏目索引">
+            {BOOK_PAGES.map((item, index) => (
+              <button
+                key={item.to}
+                type="button"
+                className={cn('book-tab', item.to === location.pathname && 'is-active')}
+                style={{ '--tab-hue': item.hue } as CSSProperties}
+                onClick={() => goTo(item.to)}
+                aria-label={`${item.label}（第 ${index + 1} 页）`}
+                aria-current={item.to === location.pathname ? 'page' : undefined}
+                title={`${item.label} · 第 ${index + 1} 页`}
+                data-testid={`book-tab-${tabSlug(item.to)}`}
+              >
+                <item.icon size={16} strokeWidth={1.9} />
+                <span>{String(index + 1).padStart(2, '0')}</span>
+                <span className="book-tab-label">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+
+          <div className="book-stage" ref={stageRef}>
+            {leaves.map((leaf, index) => (
+              <BookLeaf
+                key={leaf.id}
+                leaf={leaf}
+                active={leaves.length === 1 && index === 0}
+                onFlip={handleFlip}
+              />
+            ))}
           </div>
-          <button type="button" className="btn btn-secondary btn-sm !p-2" aria-label="打开更多导航" onClick={() => setMoreOpen(true)}>
-            <Menu size={17} />
-          </button>
-        </header>
 
-        <main className="mx-auto w-full max-w-[1180px] px-4 pb-28 pt-5 sm:px-6 lg:pb-12 lg:pt-8">
-          <PageAtmosphere />
-          <SectionMascot />
-          <div ref={pageRef} key={location.pathname} className="page-motion">{children}</div>
-        </main>
+          <div className="book-page-foot">
+            <button
+              type="button"
+              className="book-flip-btn is-prev"
+              onClick={goPrev}
+              disabled={!prevPage}
+              aria-label={prevPage ? `上一页：${prevPage.label}` : '已是第一页'}
+              title={prevPage ? `上一页：${prevPage.label}` : '已是第一页'}
+              data-testid="book-prev"
+            >
+              <ChevronUp size={16} />
+            </button>
+            <p className="book-pageno">
+              <span className="book-pageno-rule" aria-hidden="true" />
+              <span>{currentMeta.label}</span>
+              <em>{pageLabel}</em>
+              <span className="book-pageno-rule" aria-hidden="true" />
+            </p>
+            <button
+              type="button"
+              className="book-flip-btn is-next"
+              onClick={goNext}
+              disabled={!nextPage}
+              aria-label={nextPage ? `下一页：${nextPage.label}` : '已是最后一页'}
+              title={nextPage ? `下一页：${nextPage.label}` : '已是最后一页'}
+              data-testid="book-next"
+            >
+              <ChevronDown size={16} />
+            </button>
+          </div>
+        </div>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#E7E3DA] bg-[#FBF9F4]/95 backdrop-blur lg:hidden" aria-label="底部导航">
-        <div className="grid grid-cols-5">
-          {MOBILE_PRIMARY.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              className={({ isActive }) => cn('flex flex-col items-center gap-1 py-2.5 text-[10.5px]', isActive ? 'text-[var(--accent-ink)]' : 'text-[#7A786F]')}
-            >
-              <item.icon size={19} strokeWidth={1.9} />
-              {item.label}
-            </NavLink>
-          ))}
-          <button type="button" className="flex flex-col items-center gap-1 py-2.5 text-[10.5px] text-[#7A786F]" onClick={() => setMoreOpen(true)}>
-            <MoreHorizontal size={19} />
-            更多
-          </button>
-        </div>
-        <div className="h-[env(safe-area-inset-bottom)]" />
+      <nav className="book-mobile-bar lg:hidden" aria-label="账本翻页">
+        <button type="button" className="book-mobile-step" onClick={goPrev} disabled={!prevPage} aria-label={prevPage ? `上一页：${prevPage.label}` : '已是第一页'}>
+          <ChevronUp size={18} />
+          <span>上一页</span>
+        </button>
+        <button type="button" className="book-mobile-toc" onClick={() => setTocOpen(true)} data-testid="book-toc">
+          <BookOpen size={17} />
+          <span>目录 · {currentMeta.label}</span>
+        </button>
+        <button type="button" className="book-mobile-step" onClick={goNext} disabled={!nextPage} aria-label={nextPage ? `下一页：${nextPage.label}` : '已是最后一页'}>
+          <ChevronDown size={18} />
+          <span>下一页</span>
+        </button>
       </nav>
 
-      {moreOpen && (
-        <div className="modal-scrim lg:hidden" onMouseDown={(e) => e.target === e.currentTarget && setMoreOpen(false)}>
-          <div className="modal-panel fade-in p-4">
+      {tocOpen && (
+        <div className="modal-scrim lg:hidden" onMouseDown={(e) => e.target === e.currentTarget && setTocOpen(false)}>
+          <div className="modal-panel fade-in book-toc-panel p-4" role="dialog" aria-label="账本目录">
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-semibold">更多功能 · {activeLabel}</p>
-              <button type="button" className="btn btn-ghost btn-sm !p-2" onClick={() => setMoreOpen(false)} aria-label="关闭">
+              <div>
+                <p className="text-sm font-semibold">账本目录 · {pageLabel}</p>
+                <p className="mt-0.5 text-[11px] text-[#8A887F]">选择栏目会像翻开账本一样切换页面</p>
+              </div>
+              <button type="button" className="btn btn-ghost btn-sm !p-2" onClick={() => setTocOpen(false)} aria-label="关闭目录">
                 <X size={16} />
               </button>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {MOBILE_MORE.map((item) => (
+              {BOOK_PAGES.map((item, index) => (
                 <button
                   key={item.to}
                   type="button"
-                  className="flex items-center gap-2 rounded-xl border border-[#E4E0D8] bg-white px-3 py-3 text-left text-[13px] font-medium"
+                  className={cn('book-toc-item', item.to === location.pathname && 'is-active')}
+                  style={{ '--tab-hue': item.hue } as CSSProperties}
                   onClick={() => {
-                    setMoreOpen(false);
-                    navigate(item.to);
+                    setTocOpen(false);
+                    goTo(item.to);
                   }}
+                  data-testid={`book-toc-${tabSlug(item.to)}`}
                 >
-                  <item.icon size={16} className="text-[var(--nav-hue,var(--accent))]" />
-                  {item.label}
+                  <item.icon size={16} />
+                  <span className="flex-1 text-left">{item.label}</span>
+                  <em>{String(index + 1).padStart(2, '0')}</em>
                 </button>
               ))}
             </div>
@@ -184,30 +455,29 @@ export function AppShell({ children }: { children: ReactNode }) {
                 type="button"
                 className="btn btn-primary flex-1"
                 onClick={() => {
-                  setMoreOpen(false);
-                  navigate('/ledger?quick=1');
+                  setTocOpen(false);
+                  goTo('/ledger?quick=1');
                 }}
               >
                 <Plus size={15} /> 快速记一笔
               </button>
-              <button type="button" className="btn btn-secondary" onClick={() => setMoreOpen(false)}>
-                关闭
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setTocOpen(false);
+                  goTo(SETTINGS_PAGE.to);
+                }}
+              >
+                <Settings size={15} /> 设置
               </button>
             </div>
-            {user && (
-              <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-[#E4E0D8] bg-[#FAF8F3] px-3 py-2.5">
-                <div className="flex min-w-0 items-center gap-2">
-                  <UserRound size={15} className="shrink-0 text-[var(--accent-ink)]" />
-                  <span className="truncate text-[12.5px] font-semibold">{user.username}</span>
-                </div>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setMoreOpen(false); logout(); }}>
-                  <LogOut size={14} /> 退出登录
-                </button>
-              </div>
-            )}
           </div>
         </div>
       )}
+
+      <SectionMascot />
+      {introPending && <LedgerIntro />}
     </div>
   );
 }
