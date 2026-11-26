@@ -98,6 +98,30 @@ export async function getUserById(id: string): Promise<AuthUser | null> {
   return row ? { id: row.id, username: row.username } : null;
 }
 
+export async function updateUsername(userId: string, username: string): Promise<AuthUser> {
+  const name = username.trim();
+  if (!USERNAME_RE.test(name)) throw new Error('用户名需为 2–20 个字符（中文、字母、数字、下划线或连字符）');
+  const lower = name.toLowerCase();
+  const existing = await db().users.where('usernameLower').equals(lower).first();
+  if (existing && existing.id !== userId) throw new Error('该用户名已被注册');
+  const row = await db().users.get(userId);
+  if (!row) throw new Error('账户不存在，请重新登录');
+  await db().users.update(userId, { username: name, usernameLower: lower });
+  return { id: userId, username: name };
+}
+
+export async function changeUserPassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+  if (newPassword.length < 6 || newPassword.length > 64) throw new Error('新密码长度需为 6–64 个字符');
+  if (newPassword === currentPassword) throw new Error('新密码不能与当前密码相同');
+  const row = await db().users.get(userId);
+  if (!row) throw new Error('账户不存在，请重新登录');
+  const currentHash = await hashPassword(currentPassword, row.salt);
+  if (!constantTimeEqual(currentHash, row.passHash)) throw new Error('当前密码不正确');
+  const salt = randomSaltHex();
+  const passHash = await hashPassword(newPassword, salt);
+  await db().users.update(userId, { passHash, salt });
+}
+
 export async function countUsers(): Promise<number> {
   return db().users.count();
 }

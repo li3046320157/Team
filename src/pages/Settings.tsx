@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { CalendarRange, Check, Info, Landmark, Palette, Plus, Save, Settings2, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
+import { CalendarRange, Check, Info, KeyRound, Landmark, Palette, Plus, Save, Settings2, ShieldCheck, Sparkles, Trash2, UserRound } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { addDaysISO, formatCN, todayISO } from '../domain/days';
 import { formatMoney, parseMoneyInput } from '../domain/money';
@@ -28,6 +28,10 @@ export function SettingsPage() {
   const apply = useAppStore((s) => s.apply);
   const addAccountAction = useAppStore((s) => s.addAccount);
   const notify = useAppStore((s) => s.notify);
+  const user = useAppStore((s) => s.user);
+  const updateProfile = useAppStore((s) => s.updateProfile);
+  const changePassword = useAppStore((s) => s.changePassword);
+  const logout = useAppStore((s) => s.logout);
   const today = todayISO();
   const s = dataset.settings;
   const [motion, setMotionState] = useState<MotionLevel>(() => getMotionLevel());
@@ -62,6 +66,14 @@ export function SettingsPage() {
   const [accError, setAccError] = useState<string | null>(null);
   const [wipeOpen, setWipeOpen] = useState(false);
   const [wiping, setWiping] = useState(false);
+  const [profileName, setProfileName] = useState(user?.username ?? '');
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [currentPwd, setCurrentPwd] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [pwdError, setPwdError] = useState<string | null>(null);
+  const [pwdSaving, setPwdSaving] = useState(false);
 
   const save = async () => {
     setError(null);
@@ -167,11 +179,40 @@ export function SettingsPage() {
     }
   };
 
+  const saveProfile = async () => {
+    setProfileError(null);
+    const name = profileName.trim();
+    if (!name) return setProfileError('请填写用户名');
+    if (name === user?.username) return setProfileError('新用户名与当前用户名相同');
+    setProfileSaving(true);
+    const message = await updateProfile(name);
+    setProfileSaving(false);
+    if (message) return setProfileError(message);
+    notify('个人信息已更新，界面即将刷新', 'success');
+    window.setTimeout(() => window.location.reload(), 700);
+  };
+
+  const submitPassword = async () => {
+    setPwdError(null);
+    if (!currentPwd) return setPwdError('请填写当前密码');
+    if (newPwd.length < 6 || newPwd.length > 64) return setPwdError('新密码长度需为 6–64 个字符');
+    if (newPwd !== confirmPwd) return setPwdError('两次输入的新密码不一致');
+    setPwdSaving(true);
+    const message = await changePassword(currentPwd, newPwd);
+    setPwdSaving(false);
+    if (message) return setPwdError(message);
+    notify('密码已修改，请使用新密码重新登录', 'success');
+    window.setTimeout(() => {
+      logout();
+      window.location.hash = '#/login';
+    }, 900);
+  };
+
   return (
     <div className="fade-in" data-testid="settings">
       <PageHeader
-        title="设置"
-        description="调整安全线、月预算、账户和检测参数，让预测与提醒更符合你的实际情况。参数会影响预测、异常检测、周期识别、目标分配与沙盘。所有金额以整数分存储。"
+        title="个人设置"
+        description="管理个人资料与登录密码，并调整安全线、月预算、账户和检测参数。参数会影响预测、异常检测、周期识别、目标分配与沙盘，所有金额以整数分存储。"
         actions={(
           <>
             {savedAt && <span key={savedAt} className="badge-pop inline-flex"><Badge tone="teal"><Check size={11} /> {savedAt} 已保存</Badge></span>}
@@ -225,6 +266,70 @@ export function SettingsPage() {
           </ul>
           <Button variant="secondary" size="sm" className="mt-3" onClick={() => { setAccError(null); setAccountOpen(true); }} data-testid="add-account"><Plus size={13} /> 新增账户</Button>
           <InfoNote>账户本身不支持归档操作入口；期初日期决定余额计算的起点，历史交易不会早于期初。</InfoNote>
+        </Card>
+
+        <Card className="rise" style={{ '--i': 1.5 } as CSSProperties} title="个人资料" subtitle="用户名会显示在左上角账户菜单" action={<UserRound size={15} className="text-[var(--accent-ink)]" />}>
+          <div className="space-y-3">
+            <Field label="用户名" hint="2–20 个字符，支持中文、字母、数字、下划线与连字符；保存后页面会自动刷新。">
+              <input
+                className="input"
+                value={profileName}
+                maxLength={20}
+                autoComplete="username"
+                onChange={(e) => setProfileName(e.target.value)}
+                data-testid="profile-username"
+              />
+            </Field>
+            {profileError && <p className="rounded-lg bg-[#FCF1EF] px-3 py-2 text-[12px] text-[#98362E]" role="alert" data-testid="profile-error">{profileError}</p>}
+            <div className="flex items-center gap-2">
+              <Button variant="primary" size="sm" onClick={() => void saveProfile()} disabled={profileSaving} data-testid="save-profile">
+                <Save size={13} /> {profileSaving ? '保存中…' : '保存资料'}
+              </Button>
+              <span className="text-[10.5px] text-[#8A887F]">改名不影响账本、目标与备份。</span>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="rise" style={{ '--i': 1.6 } as CSSProperties} title="登录密码" subtitle="修改成功后会自动退出并回到登录页" action={<KeyRound size={15} className="text-[var(--accent-ink)]" />}>
+          <div className="space-y-3">
+            <Field label="当前密码">
+              <input
+                className="input"
+                type="password"
+                value={currentPwd}
+                autoComplete="current-password"
+                onChange={(e) => setCurrentPwd(e.target.value)}
+                data-testid="current-password"
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="新密码" hint="6–64 个字符">
+                <input
+                  className="input"
+                  type="password"
+                  value={newPwd}
+                  autoComplete="new-password"
+                  onChange={(e) => setNewPwd(e.target.value)}
+                  data-testid="new-password"
+                />
+              </Field>
+              <Field label="确认新密码">
+                <input
+                  className="input"
+                  type="password"
+                  value={confirmPwd}
+                  autoComplete="new-password"
+                  onChange={(e) => setConfirmPwd(e.target.value)}
+                  data-testid="confirm-new-password"
+                />
+              </Field>
+            </div>
+            {pwdError && <p className="rounded-lg bg-[#FCF1EF] px-3 py-2 text-[12px] text-[#98362E]" role="alert" data-testid="password-error">{pwdError}</p>}
+            <Button variant="primary" size="sm" onClick={() => void submitPassword()} disabled={pwdSaving} data-testid="change-password">
+              <KeyRound size={13} /> {pwdSaving ? '修改中…' : '修改密码'}
+            </Button>
+            <InfoNote tone="warn">密码只以加盐哈希保存在这台设备。修改后所有打开的本机标签页都需要重新登录，请妥善保管新密码。</InfoNote>
+          </div>
         </Card>
 
         <Card className="rise" style={{ '--i': 2 } as CSSProperties} title="历史覆盖区间" subtitle="只有登记为覆盖的日期才参与模型训练、异常与回测，避免把「没记账」误判为「没消费」" action={<CalendarRange size={15} className="text-[var(--accent-ink)]" />}>

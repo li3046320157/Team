@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import type { Dataset, DataMode } from '../domain/types';
 import { todayISO } from '../domain/days';
 import { clearDataset, describeDbError, readDataset, writeDataset, setPersonalDbName } from '../data/db';
-import { clearSession, getUserById, loginUser, personalDbNameFor, readSession, registerUser, storeSession, type AuthUser } from '../data/auth';
+import { changeUserPassword, clearSession, getUserById, loginUser, personalDbNameFor, readSession, registerUser, storeSession, updateUsername, type AuthUser } from '../data/auth';
 import { createEmptyDataset } from '../data/defaults';
 import { applyCleanSlateOnce } from '../data/wipe';
 import { addAccount, applyOnboarding, type AccountInput } from '../services/mutations';
@@ -28,6 +28,8 @@ interface AppState {
   boot: () => Promise<void>;
   register: (username: string, password: string) => Promise<string | null>;
   login: (username: string, password: string) => Promise<string | null>;
+  updateProfile: (username: string) => Promise<string | null>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<string | null>;
   logout: () => void;
   init: () => Promise<void>;
   apply: (mutator: (dataset: Dataset) => Dataset, successMessage?: string) => Promise<boolean>;
@@ -131,6 +133,29 @@ export const useAppStore = create<AppState>((set, get) => ({
       return null;
     } catch (error) {
       return error instanceof Error ? error.message : '登录失败，请重试';
+    }
+  },
+
+  updateProfile: async (username) => {
+    const state = get();
+    if (!state.user) return '请先登录';
+    try {
+      const user = await updateUsername(state.user.id, username);
+      set({ user });
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : '修改失败，请重试';
+    }
+  },
+
+  changePassword: async (currentPassword, newPassword) => {
+    const state = get();
+    if (!state.user) return '请先登录';
+    try {
+      await changeUserPassword(state.user.id, currentPassword, newPassword);
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : '修改密码失败，请重试';
     }
   },
 
