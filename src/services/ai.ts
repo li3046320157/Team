@@ -313,7 +313,7 @@ export function buildAnalysisContext(dataset: Dataset, mode: DataMode): string {
 }
 
 export const ANALYSIS_SYSTEM_PROMPT = [
-  '你是 MoneyFlow 钱流的本地财务分析助手。用户会提供一份由其本机账本生成的中文摘要，请基于摘要回答。',
+  '你是金钱流水的本地财务分析助手。用户会提供一份由其本机账本生成的中文摘要，请基于摘要回答。',
   '要求：',
   '1. 金额单位均为人民币元；引用数字时与摘要保持一致，不要编造摘要中没有的数据。',
   '2. 先给结论，再给依据与建议；建议要具体可执行（如调整哪类支出、何时购买更稳妥）。',

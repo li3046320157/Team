@@ -265,7 +265,7 @@ export interface BackupValidation {
 export function createBackup(dataset: Dataset): string {
   return JSON.stringify(
     {
-      app: 'MoneyFlow 钱流',
+      app: '金钱流水',
       formatVersion: BACKUP_FORMAT_VERSION,
       exportedAt: new Date().toISOString(),
       currency: 'CNY',

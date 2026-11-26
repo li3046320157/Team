@@ -49,17 +49,17 @@ export function Onboarding() {
           <div className="rise flex items-center gap-3">
             <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--accent)] text-[22px] font-bold text-white">¥</div>
             <div>
-              <p className="text-[22px] font-semibold tracking-tight">MoneyFlow 钱流</p>
+              <p className="text-[22px] font-semibold tracking-tight">金钱流水</p>
               <p className="text-[11.5px] tracking-[0.16em] text-[#8A887F]">看清现金流向，再做消费决定</p>
             </div>
           </div>
           <h1 className="rise mt-9 text-[30px] font-semibold leading-[1.2] tracking-[-0.02em] sm:text-[36px]" style={{ '--d': '28ms' } as CSSProperties}>
-            不猜、不夸大，
+            每一笔小钱，
             <br />
-            用可解释的模型看未来 90 天。
+            都放进日、月、年的账里。
           </h1>
           <p className="rise mt-4 max-w-xl text-[13.5px] leading-relaxed text-[#6B6A63]" style={{ '--d': '56ms' } as CSSProperties}>
-            MoneyFlow 把真实流水、固定计划、目标预留放进同一本账，给出可追溯的余额预测与可执行的储蓄建议。所有数据仅保存在本机浏览器。
+            金钱流水把真实流水、固定计划、目标预留放进同一本账，按日、月、年回看收支，并给出可追溯的余额预测。所有数据仅保存在本机浏览器。
           </p>
           <ul className="mt-6 space-y-3.5">
             {[

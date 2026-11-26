@@ -312,7 +312,7 @@ export function SettingsPage() {
           </Button>
         </Card>
 
-        <Card className="rise" style={{ '--i': 9 } as CSSProperties} title="关于与数据原则" subtitle="MoneyFlow 钱流 · 本地优先的个人现金流工作台" action={<Settings2 size={15} className="text-[#8A887F]" />}>
+        <Card className="rise" style={{ '--i': 9 } as CSSProperties} title="关于与数据原则" subtitle="金钱流水 · 本地优先的个人现金流工作台" action={<Settings2 size={15} className="text-[#8A887F]" />}>
           <ul className="space-y-2 text-[11.5px] leading-relaxed text-[#6B6A63]">
             <li>版本 1.0.0 · 数据格式 v1 · 设置版本 v{s.settingsVersion}</li>
             <li>所有数据存于浏览器 IndexedDB，不上传；备份文件由你自行保管。</li>

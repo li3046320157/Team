@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, Lock, ShieldCheck, User, UserPlus } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { formatCN, todayISO } from '../domain/days';
+import { CoinRain } from './CoinRain';
 import { PalettePicker } from './PalettePicker';
 import { cn } from './ui';
 
@@ -278,6 +279,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
   return (
     <div className="auth-scene" data-testid="auth-page">
+      <CoinRain />
       <span className="auth-glow auth-glow-a" aria-hidden="true" />
       <span className="auth-glow auth-glow-b" aria-hidden="true" />
       <span className="auth-watermark" aria-hidden="true">¥</span>
@@ -286,18 +288,18 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           <div className="auth-brand">
             <div className="brand-mark auth-logo grid h-11 w-11 place-items-center rounded-2xl text-xl font-bold text-white">¥</div>
             <div>
-              <p className="text-[17px] font-semibold tracking-tight">MoneyFlow 钱流</p>
+              <p className="text-[17px] font-semibold tracking-tight">金钱流水</p>
               <p className="mt-0.5 text-[10px] tracking-[0.2em] text-[#8A887F]">本地账本 · LOCAL LEDGER</p>
             </div>
           </div>
           <CoinStage />
           <div className="auth-hero-copy">
-            <p className="auth-hero-kicker">顺手记一笔 · 未来看得清</p>
+            <p className="auth-hero-kicker">顺手记一笔 · 日月年都看得清</p>
             <h1 className="auth-hero-title">把每一枚小钱，<br />都记进同一本账。</h1>
-            <p className="auth-hero-sub">点击飘落的小金币会闪亮消失；账本、账户与预测都只留在本机浏览器。</p>
+            <p className="auth-hero-sub">金币雨会随鼠标方向飘落，点击小金币会闪亮消失；账本、账户与流水都只留在本机浏览器。</p>
             <div className="auth-hero-chips" aria-hidden="true">
-              <span className="is-accent">日 · 周 · 月监测</span>
-              <span className="is-gold">90 天现金流预测</span>
+              <span className="is-accent">日 · 月 · 年监测</span>
+              <span className="is-gold">现金流预测</span>
               <span className="is-green">目标预留</span>
             </div>
           </div>
@@ -307,7 +309,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           <div key={mode} className="auth-card ledger-paper">
             <span className="ledger-seal" aria-hidden="true">账</span>
             <header className="ledger-head">
-              <p className="ledger-kicker">MONEYFLOW · 本地账本</p>
+              <p className="ledger-kicker">金钱流水 · 本地账本</p>
               <h2 className="ledger-title">{mode === 'login' ? '欢迎回来' : '创建本地账户'}</h2>
               <p className="ledger-date">{formatCN(todayISO())} · {mode === 'login' ? '对账入账' : '开立新户'}</p>
             </header>
