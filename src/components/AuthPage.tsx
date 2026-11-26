@@ -240,13 +240,21 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const location = useLocation();
   const registeredName = (location.state as { registeredName?: string } | null)?.registeredName ?? '';
 
-  const [username, setUsername] = useState(mode === 'login' ? registeredName : '');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [shakeKey, setShakeKey] = useState(0);
+
+  useEffect(() => {
+    setUsername('');
+    setPassword('');
+    setConfirm('');
+    setError(null);
+    setShowPassword(false);
+  }, [mode]);
 
   const fail = (message: string) => {
     setError(message);
@@ -336,7 +344,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             {mode === 'login' && registeredName && (
               <p className="fade-in mt-3 flex items-start gap-2 rounded-lg border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-2 text-[12px] leading-relaxed text-[var(--accent-ink)]" data-testid="auth-registered-note">
                 <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
-                注册成功！已为你填好用户名，请输入密码登录进入账本。
+                注册成功！账户「{registeredName}」已创建，请重新输入用户名和密码登录。
               </p>
             )}
 

@@ -2038,3 +2038,432 @@ table.data tbody tr:hover {
     opacity: 1;
   }
 }
+
+/* ---- 左上角账户菜单（常驻） ---- */
+.account-wrap {
+  position: relative;
+  margin-top: 18px;
+}
+.account-wrap-mobile {
+  margin-top: 0;
+}
+.account-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid #e4e0d8;
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color calc(180ms * var(--site-motion, 1)) var(--ease-standard),
+    background calc(180ms * var(--site-motion, 1)) var(--ease-standard),
+    box-shadow calc(180ms * var(--site-motion, 1)) var(--ease-standard);
+}
+.account-trigger:hover {
+  border-color: color-mix(in srgb, var(--accent) 32%, #e4e0d8);
+  background: #fcfbf8;
+  box-shadow: 0 10px 20px -18px rgba(31, 36, 33, 0.5);
+}
+.account-trigger[aria-expanded='true'] {
+  border-color: color-mix(in srgb, var(--accent) 40%, #e4e0d8);
+  background: #fcfbf8;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.account-avatar {
+  display: grid;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.account-avatar.is-large {
+  width: 36px;
+  height: 36px;
+  font-size: 14px;
+}
+.account-meta {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.account-name {
+  overflow: hidden;
+  color: #2e332d;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-role {
+  margin-top: 2px;
+  color: #8a887f;
+  font-size: 10px;
+}
+.account-chevron {
+  flex-shrink: 0;
+  color: #a3a097;
+  transition: transform calc(180ms * var(--site-motion, 1)) var(--ease-standard);
+}
+.account-chevron.is-open {
+  transform: rotate(180deg);
+}
+.account-popover {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  right: 0;
+  z-index: 45;
+  padding: 10px;
+  border: 1px solid #e4e0d8;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 26px 48px -30px rgba(31, 36, 33, 0.6);
+  animation: accountPop calc(190ms * var(--site-motion, 1)) var(--ease-soft) both;
+}
+@keyframes accountPop {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.account-pop-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 2px 2px 8px;
+}
+.account-pop-sep {
+  height: 1px;
+  margin: 2px 0 6px;
+  background: #efece6;
+}
+.account-pop-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #3a3d37;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background calc(150ms * var(--site-motion, 1)) var(--ease-standard);
+}
+.account-pop-item:hover {
+  background: #f6f4ee;
+}
+.account-pop-item.is-danger {
+  color: #98362e;
+}
+.account-pop-item.is-danger:hover {
+  background: #fcf1ef;
+}
+.account-pop-note {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 6px 8px 2px;
+  border-top: 1px dashed #efece6;
+  color: #a3a097;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.account-trigger.is-mobile {
+  width: auto;
+  gap: 6px;
+  padding: 4px 6px 4px 4px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.account-trigger.is-mobile:hover,
+.account-trigger.is-mobile[aria-expanded='true'] {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: none;
+}
+.account-trigger.is-mobile .account-name {
+  max-width: 88px;
+  font-size: 12px;
+}
+.account-trigger.is-mobile .account-chevron {
+  display: none;
+}
+.account-wrap-mobile .account-popover {
+  right: auto;
+  left: 0;
+  width: 240px;
+}
+
+/* ---- 各栏目吉祥物 / AI 机器人 ---- */
+.mascot-dock {
+  position: fixed;
+  left: 36px;
+  bottom: 80px;
+  z-index: 31;
+  pointer-events: none;
+  --mascot-hue: var(--accent);
+}
+.mascot-figure {
+  position: relative;
+  display: block;
+  width: 112px;
+  height: 124px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
+}
+.mascot-halo {
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 70px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--mascot-hue) 26%, transparent), transparent 70%);
+  filter: blur(9px);
+  opacity: 0.9;
+}
+.mascot-hop,
+.mascot-bob {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.mascot-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 12px 16px rgba(31, 36, 33, 0.14));
+  transition: transform calc(180ms * var(--site-motion, 1)) var(--ease-soft);
+}
+.mascot-figure:hover .mascot-svg {
+  transform: translateY(-3px);
+}
+.mascot-shadow {
+  fill: rgba(31, 36, 33, 0.12);
+}
+.pal-body {
+  fill: color-mix(in srgb, var(--mascot-hue) 78%, #fff);
+}
+.pal-belly {
+  fill: color-mix(in srgb, var(--mascot-hue) 18%, #fff);
+}
+.pal-arm {
+  fill: color-mix(in srgb, var(--mascot-hue) 66%, #4a4e46);
+}
+.pal-band {
+  stroke: color-mix(in srgb, var(--mascot-hue) 82%, #2e332d);
+}
+.robot-glow {
+  fill: color-mix(in srgb, var(--mascot-hue) 30%, transparent);
+}
+.robot-pupil {
+  fill: #9fe8d8;
+  filter: drop-shadow(0 0 3px rgba(159, 232, 216, 0.9));
+}
+.robot-antenna {
+  fill: color-mix(in srgb, var(--mascot-hue) 72%, #fff);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--mascot-hue) 60%, transparent));
+  animation: robotAntenna 2.4s ease-in-out infinite;
+}
+.robot-light,
+.robot-chip-dot {
+  fill: #9fe8d8;
+  animation: robotPulse 2.6s ease-in-out infinite;
+}
+.robot-light.is-late,
+.robot-chip-dot.is-late {
+  animation-delay: 0.45s;
+}
+.robot-light.is-later,
+.robot-chip-dot.is-later {
+  animation-delay: 0.9s;
+}
+@keyframes robotPulse {
+  0%,
+  100% {
+    opacity: 0.32;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes robotAntenna {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.mascot-prop {
+  position: absolute;
+  right: -2px;
+  bottom: 20px;
+  z-index: 2;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--mascot-hue) 26%, #e4e0d8);
+  border-radius: 50%;
+  background: #fff;
+  color: color-mix(in srgb, var(--mascot-hue) 84%, #2e332d);
+  box-shadow: 0 8px 16px -10px rgba(31, 36, 33, 0.5);
+  transition: transform calc(180ms * var(--site-motion, 1)) var(--ease-soft);
+}
+.mascot-figure:hover .mascot-prop {
+  transform: translateY(-2px) rotate(-6deg);
+}
+.robot-chip {
+  position: absolute;
+  left: -4px;
+  top: 34px;
+  z-index: 2;
+  padding: 2px 6px;
+  border: 1px solid color-mix(in srgb, var(--mascot-hue) 30%, #e4e0d8);
+  border-radius: 999px;
+  background: #fff;
+  color: color-mix(in srgb, var(--mascot-hue) 84%, #2e332d);
+  font-family: var(--font-ledger);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  box-shadow: 0 6px 14px -10px rgba(31, 36, 33, 0.45);
+}
+.mascot-bubble {
+  position: absolute;
+  left: -4px;
+  bottom: calc(100% + 8px);
+  width: 232px;
+  padding: 10px 12px;
+  border: 1px solid #e4e0d8;
+  border-radius: 13px;
+  background: #fff;
+  color: #3a3d37;
+  font-size: 12px;
+  line-height: 1.6;
+  pointer-events: none;
+  box-shadow: 0 18px 34px -26px rgba(31, 36, 33, 0.65);
+  animation: mascotBubbleIn calc(200ms * var(--site-motion, 1)) var(--ease-soft) both;
+}
+.mascot-bubble::after {
+  content: '';
+  position: absolute;
+  left: 28px;
+  bottom: -5px;
+  width: 9px;
+  height: 9px;
+  border-right: 1px solid #e4e0d8;
+  border-bottom: 1px solid #e4e0d8;
+  background: #fff;
+  transform: rotate(45deg);
+}
+.mascot-bubble.is-robot {
+  border-color: color-mix(in srgb, var(--mascot-hue) 26%, #e4e0d8);
+}
+@keyframes mascotBubbleIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 1023px) {
+  .mascot-dock {
+    left: auto;
+    right: 12px;
+    bottom: 78px;
+  }
+  /* 移动端 AI 页的对话输入区在右下角，悬浮机器人会挡住发送/清空按钮 */
+  .mascot-dock.is-robot {
+    display: none;
+  }
+  .mascot-figure {
+    width: 86px;
+    height: 96px;
+  }
+  .mascot-bubble {
+    right: 4px;
+    left: auto;
+    width: 200px;
+    font-size: 11.5px;
+  }
+  .mascot-bubble::after {
+    right: 24px;
+    left: auto;
+  }
+  .mascot-prop {
+    right: -2px;
+    bottom: 14px;
+    width: 26px;
+    height: 26px;
+  }
+  .robot-chip {
+    top: 25px;
+  }
+}
+@media (max-width: 420px) {
+  .mascot-dock {
+    left: auto;
+    right: 8px;
+    bottom: 74px;
+  }
+  .mascot-figure {
+    width: 74px;
+    height: 82px;
+  }
+  .mascot-bubble {
+    right: -6px;
+    width: 186px;
+  }
+}
+:root[data-motion='reduced'] .robot-antenna,
+:root[data-motion='reduced'] .robot-light,
+:root[data-motion='reduced'] .robot-chip-dot,
+:root[data-motion='reduced'] .account-popover,
+:root[data-motion='reduced'] .mascot-bubble {
+  animation: none;
+}
+:root[data-motion='reduced'] .account-trigger,
+:root[data-motion='reduced'] .account-chevron,
+:root[data-motion='reduced'] .account-pop-item,
+:root[data-motion='reduced'] .mascot-svg,
+:root[data-motion='reduced'] .mascot-prop {
+  transition: none;
+}
+:root[data-motion='reduced'] .mascot-figure:hover .mascot-svg,
+:root[data-motion='reduced'] .mascot-figure:hover .mascot-prop {
+  transform: none;
+}

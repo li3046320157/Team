@@ -12,7 +12,6 @@ import {
   Menu,
   MoreHorizontal,
   Plus,
-  Settings,
   Sparkles,
   Target,
   UserRound,
@@ -22,7 +21,9 @@ import { useAppStore } from '../store/useAppStore';
 import { ScrollTrigger } from '../motion/gsap';
 import { ScrollProgress } from '../motion/ScrollProgress';
 import { usePageReveal } from '../motion/usePageReveal';
+import { AccountMenu } from './AccountMenu';
 import { PageAtmosphere } from './PageAtmosphere';
+import { SectionMascot } from './SectionMascot';
 import { cn } from './ui';
 
 const NAV = [
@@ -35,19 +36,20 @@ const NAV = [
   { to: '/sandbox', label: '决策沙盘', icon: FlaskConical, hue: 'var(--tone-orange)' },
   { to: '/goals', label: '目标', icon: Target, hue: 'var(--tone-green)' },
   { to: '/data', label: '数据中心', icon: Database, hue: 'var(--tone-slate)' },
-  { to: '/settings', label: '设置', icon: Settings, hue: 'var(--tone-stone)' },
 ];
+
+const SETTINGS_LABEL = '个人设置';
 
 const MOBILE_PRIMARY = NAV.filter((n) => ['/', '/ledger', '/forecast', '/goals'].includes(n.to));
 const MOBILE_MORE = NAV.filter((n) => !['/', '/ledger', '/forecast', '/goals'].includes(n.to));
 
-function Brand() {
+function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="brand-mark grid h-9 w-9 place-items-center rounded-[11px] text-[17px] font-bold text-white">¥</div>
+      <div className={cn('brand-mark grid place-items-center font-bold text-white', compact ? 'h-8 w-8 rounded-[10px] text-[15px]' : 'h-9 w-9 rounded-[11px] text-[17px]')}>¥</div>
       <div>
-        <p className="text-[15px] font-semibold leading-none tracking-tight">金钱流水</p>
-        <p className="mt-1 text-[10.5px] font-medium tracking-[0.16em] text-[#8A887F]">日 · 月 · 年 · 本地账本</p>
+        <p className={cn('font-semibold leading-none tracking-tight', compact ? 'text-[13px]' : 'text-[15px]')}>金钱流水</p>
+        {!compact && <p className="mt-1 text-[10.5px] font-medium tracking-[0.16em] text-[#8A887F]">日 · 月 · 年 · 本地账本</p>}
       </div>
     </div>
   );
@@ -60,7 +62,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
-  const activeLabel = NAV.find((n) => n.to === location.pathname)?.label ?? '金钱流水';
+  const activeLabel = location.pathname === '/settings'
+    ? SETTINGS_LABEL
+    : NAV.find((n) => n.to === location.pathname)?.label ?? '金钱流水';
   const pageRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
 
@@ -87,7 +91,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <ScrollProgress />
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] flex-col border-r border-[#E7E3DA] bg-[#FBF9F4]/90 px-4 py-5 backdrop-blur lg:flex">
         <Brand />
-        <nav className="mt-7 flex flex-1 flex-col gap-0.5" aria-label="主导航">
+        <AccountMenu />
+        <nav className="mt-4 flex flex-1 flex-col gap-0.5" aria-label="主导航">
           {NAV.map((item) => (
             <NavLink
               key={item.to}
@@ -101,18 +106,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </NavLink>
           ))}
         </nav>
-        <div className="mt-4 space-y-2">
-          {user && (
-            <div className="flex items-center justify-between gap-2 rounded-xl border border-[#E4E0D8] bg-white px-3 py-2.5" data-testid="user-chip">
-              <div className="flex min-w-0 items-center gap-2">
-                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-ink)]"><UserRound size={14} /></div>
-                <span className="truncate text-[12px] font-semibold text-[#3A3D37]">{user.username}</span>
-              </div>
-              <button type="button" className="btn btn-ghost btn-xs shrink-0" onClick={logout} aria-label="退出登录" data-testid="logout">
-                <LogOut size={13} /> 退出
-              </button>
-            </div>
-          )}
+        <div className="mt-4">
           <p className="px-1 text-[10.5px] leading-relaxed text-[#A3A097]">
             整数分计算 · 本地 IndexedDB
             <br />
@@ -122,18 +116,19 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="lg:pl-[232px]">
-        <header ref={headerRef} className="app-header sticky top-0 z-20 flex items-center justify-between border-b border-[#E7E3DA] bg-[#F7F5F1]/85 px-4 py-3 backdrop-blur lg:hidden">
-          <Brand />
-          <div className="flex items-center gap-2">
-            <span className="chip chip-teal">本机账本</span>
-            <button type="button" className="btn btn-secondary btn-sm !p-2" aria-label="打开更多导航" onClick={() => setMoreOpen(true)}>
-              <Menu size={17} />
-            </button>
+        <header ref={headerRef} className="app-header sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-[#E7E3DA] bg-[#F7F5F1]/85 px-3 py-2.5 backdrop-blur sm:px-4 lg:hidden">
+          <div className="flex min-w-0 items-center gap-2">
+            <AccountMenu variant="mobile" />
+            <Brand compact />
           </div>
+          <button type="button" className="btn btn-secondary btn-sm !p-2" aria-label="打开更多导航" onClick={() => setMoreOpen(true)}>
+            <Menu size={17} />
+          </button>
         </header>
 
         <main className="mx-auto w-full max-w-[1180px] px-4 pb-28 pt-5 sm:px-6 lg:pb-12 lg:pt-8">
           <PageAtmosphere />
+          <SectionMascot />
           <div ref={pageRef} key={location.pathname} className="page-motion">{children}</div>
         </main>
       </div>

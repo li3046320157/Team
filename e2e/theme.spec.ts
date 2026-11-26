@@ -16,3 +16,28 @@ test('登录页金币可互动、配色可切换并持久化', async ({ page }) 
   await expect(page.locator('html')).toHaveAttribute('data-palette', 'ocean');
   await expect(page.getByTestId('palette-ocean')).toHaveAttribute('aria-pressed', 'true');
 });
+
+test('登录与注册切换后输入框自动清空', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('auth-page')).toBeVisible();
+
+  await page.getByTestId('auth-username').fill('切换前用户');
+  await page.getByTestId('auth-password').fill('wrong-pass-123');
+  await page.getByTestId('auth-submit').click();
+  await expect(page.getByTestId('auth-error')).toBeVisible();
+
+  await page.getByTestId('auth-go-register').click();
+  await expect(page).toHaveURL(/#\/register$/);
+  await expect(page.getByTestId('auth-username')).toHaveValue('');
+  await expect(page.getByTestId('auth-password')).toHaveValue('');
+  await expect(page.getByTestId('auth-confirm')).toHaveValue('');
+
+  await page.getByTestId('auth-username').fill('注册页用户');
+  await page.getByTestId('auth-password').fill('reg-pass-123');
+  await page.getByTestId('auth-confirm').fill('reg-pass-123');
+  await page.getByTestId('auth-go-login').click();
+  await expect(page).toHaveURL(/#\/login$/);
+  await expect(page.getByTestId('auth-username')).toHaveValue('');
+  await expect(page.getByTestId('auth-password')).toHaveValue('');
+  await expect(page.getByTestId('auth-confirm')).toHaveCount(0);
+});

@@ -17,7 +17,8 @@ async function loadApp(target: Page, username = 'e2e演示员') {
   await target.getByTestId('auth-submit').click();
   await expect(target).toHaveURL(/#\/login$/);
   await expect(target.getByTestId('auth-registered-note')).toBeVisible();
-  await expect(target.getByTestId('auth-username')).toHaveValue(username);
+  await expect(target.getByTestId('auth-username')).toHaveValue('');
+  await target.getByTestId('auth-username').fill(username);
   await target.getByTestId('auth-password').fill('e2e-pass-123');
   await target.getByTestId('auth-submit').click();
   await expect(target.getByRole('button', { name: '开始记账' })).toBeVisible({ timeout: 60_000 });
@@ -40,6 +41,7 @@ test.afterAll(async () => {
 
 test('总览首屏说明系统目的与全部功能，并显示日/月/年现金流摘要', async () => {
   await expect(page.getByTestId('dashboard')).toBeVisible();
+  await expect(page.getByTestId('section-mascot')).toBeVisible();
   await expect(page.getByRole('heading', { name: /花钱之前/ })).toBeVisible();
   await expect(page.getByText('全部功能 · 每个模块解决什么问题')).toBeVisible();
   await expect(page.getByRole('heading', { name: '现金流监测 · 日 / 月 / 年' })).toBeVisible();
@@ -167,6 +169,9 @@ test('设置：保存参数后显示已保存标记', async () => {
 test('AI 分析：配置校验、保存与连接失败提示', async () => {
   await page.goto('/#/assistant');
   await expect(page.getByTestId('assistant')).toBeVisible();
+  await expect(page.getByTestId('ai-robot')).toBeVisible();
+  await page.getByTestId('ai-robot').click();
+  await expect(page.getByTestId('ai-robot-bubble')).toBeVisible();
   await page.getByTestId('ai-save').click();
   await expect(page.getByRole('alert')).toContainText('地址');
   await page.getByTestId('ai-base').fill('https://api.example.com/v1');
@@ -180,6 +185,7 @@ test('AI 分析：配置校验、保存与连接失败提示', async () => {
 });
 
 test('登录注册：错误密码提示、退出与重新登录', async () => {
+  await page.getByTestId('account-menu').click();
   await page.getByTestId('logout').click();
   await expect(page.getByTestId('auth-page')).toBeVisible();
   await page.getByTestId('auth-username').fill('e2e演示员');
@@ -191,6 +197,38 @@ test('登录注册：错误密码提示、退出与重新登录', async () => {
   await expect(page.getByTestId('user-chip')).toContainText('e2e演示员', { timeout: 60_000 });
   await page.goto('/#/');
   await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
+});
+
+test('个人资料与密码：改名后自动刷新，改密后退回登录页', async ({ browser }) => {
+  const own = await browser.newContext();
+  const ownPage = await own.newPage();
+  await loadApp(ownPage, 'e2e资料员');
+
+  await ownPage.getByTestId('account-menu').click();
+  await ownPage.getByTestId('account-settings').click();
+  await expect(ownPage).toHaveURL(/#\/settings$/);
+  await expect(ownPage.getByTestId('settings')).toBeVisible();
+  await expect(ownPage.getByTestId('profile-username')).toHaveValue('e2e资料员');
+
+  await ownPage.getByTestId('profile-username').fill('e2e改名员');
+  const refreshed = ownPage.waitForEvent('load', { timeout: 20_000 });
+  await ownPage.getByTestId('save-profile').click();
+  await refreshed;
+  await expect(ownPage.getByTestId('user-chip')).toContainText('e2e改名员');
+  await expect(ownPage.getByTestId('profile-username')).toHaveValue('e2e改名员');
+  await expect(ownPage.getByTestId('settings')).toBeVisible();
+
+  await ownPage.getByTestId('current-password').fill('e2e-pass-123');
+  await ownPage.getByTestId('new-password').fill('e2e-pass-456');
+  await ownPage.getByTestId('confirm-new-password').fill('e2e-pass-456');
+  await ownPage.getByTestId('change-password').click();
+  await expect(ownPage.getByTestId('auth-page')).toBeVisible({ timeout: 20_000 });
+  await ownPage.getByTestId('auth-username').fill('e2e改名员');
+  await ownPage.getByTestId('auth-password').fill('e2e-pass-456');
+  await ownPage.getByTestId('auth-submit').click();
+  await expect(ownPage.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
+  await expect(ownPage.getByTestId('user-chip')).toContainText('e2e改名员');
+  await own.close();
 });
 
 test('清除本机数据后，新注册用户从空账本开始', async () => {
@@ -207,6 +245,8 @@ test('清除本机数据后，新注册用户从空账本开始', async () => {
   await page.getByTestId('auth-confirm').fill('e2e-pass-456');
   await page.getByTestId('auth-submit').click();
   await expect(page.getByTestId('auth-registered-note')).toBeVisible();
+  await expect(page.getByTestId('auth-username')).toHaveValue('');
+  await page.getByTestId('auth-username').fill('e2e新用户');
   await page.getByTestId('auth-password').fill('e2e-pass-456');
   await page.getByTestId('auth-submit').click();
   await expect(page.getByRole('button', { name: '开始记账' })).toBeVisible({ timeout: 60_000 });
