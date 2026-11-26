@@ -4,8 +4,8 @@ import {
   BookOpen,
   Bot,
   Calendar,
-  ChevronDown,
-  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Database,
   FlaskConical,
   LayoutDashboard,
@@ -44,7 +44,7 @@ interface BookPage {
   hue: string;
 }
 
-/** 账本正文页顺序：也是上下翻页与右侧索引的次序。 */
+/** 账本正文页顺序：也是左右翻页与底部索引的次序。 */
 export const BOOK_PAGES: BookPage[] = [
   { to: '/', label: '总览', icon: LayoutDashboard, hue: 'var(--tone-blue)' },
   { to: '/ledger', label: '流水', icon: List, hue: 'var(--tone-teal)' },
@@ -122,7 +122,34 @@ function BookLeaf({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
+  const progressRef = useRef<HTMLSpanElement>(null);
   usePageReveal(innerRef, leaf.location.pathname, scrollRef);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let raf = 0;
+    const apply = () => {
+      raf = 0;
+      const max = el.scrollHeight - el.clientHeight;
+      const progress = max > 4 ? Math.min(1, Math.max(0, el.scrollTop / max)) : 0;
+      if (progressRef.current) progressRef.current.style.transform = `scaleX(${progress.toFixed(4)})`;
+      if (isReducedMotion()) return;
+      el.querySelectorAll<HTMLElement>('[data-parallax]').forEach((item) => {
+        const speed = Number(item.dataset.parallax) || 0.16;
+        item.style.transform = `translate3d(0, ${(-el.scrollTop * speed).toFixed(2)}px, 0)`;
+      });
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(apply);
+    };
+    apply();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [scrollRef]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -132,10 +159,18 @@ function BookLeaf({
     let lastFlip = 0;
     let resetTimer = 0;
     const onWheel = (event: WheelEvent) => {
+      const now = performance.now();
+      const horizontal = Math.abs(event.deltaX) > 14 && Math.abs(event.deltaX) > Math.abs(event.deltaY) * 1.15;
+      if (horizontal) {
+        if (now - lastFlip < 850) return;
+        lastFlip = now;
+        acc = 0;
+        onFlip(event.deltaX > 0 ? 'next' : 'prev');
+        return;
+      }
       if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
       const atTop = el.scrollTop <= 1;
       const atBottom = el.scrollHeight - el.clientHeight <= 4 || el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
-      const now = performance.now();
       if (event.deltaY > 0 && atBottom) acc = Math.max(0, acc) + event.deltaY;
       else if (event.deltaY < 0 && atTop) acc = Math.min(0, acc) + event.deltaY;
       else acc = 0;
@@ -157,6 +192,7 @@ function BookLeaf({
 
   return (
     <article className="book-leaf" data-leaf-id={leaf.id}>
+      <div className="book-read-progress" aria-hidden="true"><span ref={progressRef} /></div>
       <div className="book-leaf-shadow" aria-hidden="true" />
       <div className="book-leaf-gutter" aria-hidden="true">
         <span />
@@ -250,24 +286,24 @@ export function AppShell() {
     const toShadow = toEl.querySelector<HTMLElement>('.book-leaf-shadow');
 
     if (forward) {
-      gsap.set(toEl, { zIndex: 1, rotateX: 0, y: 18, scale: 0.994, transformOrigin: '50% 0%' });
-      gsap.set(fromEl, { zIndex: 2, rotateX: 0, transformOrigin: '50% 0%' });
+      gsap.set(toEl, { zIndex: 1, rotateY: 0, x: 26, scale: 0.994, transformOrigin: '0% 50%' });
+      gsap.set(fromEl, { zIndex: 2, rotateY: 0, transformOrigin: '0% 50%' });
       gsap.set(fromShadow, { opacity: 0 });
       tlRef.current = gsap
         .timeline({ onComplete: settle })
-        .to(toEl, { y: 0, scale: 1, duration: 0.8, ease: 'power2.out' }, 0)
-        .to(fromEl, { rotateX: -106, duration: 0.78, ease: 'power2.inOut' }, 0)
-        .to(fromShadow, { opacity: 0.9, duration: 0.5, ease: 'power1.in' }, 0.02)
-        .to(fromEl, { opacity: 0.2, duration: 0.16, ease: 'power1.in' }, 0.62);
+        .to(toEl, { x: 0, scale: 1, duration: 0.8, ease: 'power2.out' }, 0)
+        .to(fromEl, { rotateY: -108, duration: 0.82, ease: 'power2.inOut' }, 0)
+        .to(fromShadow, { opacity: 0.85, duration: 0.5, ease: 'power1.in' }, 0.02)
+        .to(fromEl, { opacity: 0.16, duration: 0.18, ease: 'power1.in' }, 0.6);
     } else {
-      gsap.set(toEl, { zIndex: 3, rotateX: -106, transformOrigin: '50% 0%' });
-      gsap.set(fromEl, { zIndex: 2, y: 0, scale: 1 });
-      gsap.set(toShadow, { opacity: 0.9 });
+      gsap.set(toEl, { zIndex: 3, rotateY: -108, transformOrigin: '0% 50%' });
+      gsap.set(fromEl, { zIndex: 2, x: 0, scale: 1, transformOrigin: '0% 50%' });
+      gsap.set(toShadow, { opacity: 0.85 });
       tlRef.current = gsap
         .timeline({ onComplete: settle })
-        .to(toEl, { rotateX: 0, duration: 0.8, ease: 'power2.inOut' }, 0)
+        .to(toEl, { rotateY: 0, duration: 0.82, ease: 'power2.inOut' }, 0)
         .to(toShadow, { opacity: 0, duration: 0.62, ease: 'power1.out' }, 0.1)
-        .to(fromEl, { y: 10, scale: 0.99, duration: 0.8, ease: 'power2.inOut' }, 0);
+        .to(fromEl, { x: 18, scale: 0.992, duration: 0.82, ease: 'power2.inOut' }, 0);
     }
     return () => {
       tlRef.current?.kill();
@@ -283,7 +319,7 @@ export function AppShell() {
       gsap.fromTo(frame, { y: 34, opacity: 0, scale: 0.985 }, { y: 0, opacity: 1, scale: 1, duration: 0.7, ease: 'power3.out', clearProps: 'transform,opacity' });
     }
     if (tabs.length) {
-      gsap.fromTo(tabs, { x: 18, opacity: 0 }, { x: 0, opacity: 1, duration: 0.45, stagger: 0.035, delay: 0.18, ease: 'power2.out', clearProps: 'transform,opacity' });
+      gsap.fromTo(tabs, { y: 12, opacity: 0 }, { y: 0, opacity: 1, duration: 0.45, stagger: 0.03, delay: 0.18, ease: 'back.out(1.8)', clearProps: 'transform,opacity' });
     }
   }, { scope: shellRef });
 
@@ -291,10 +327,10 @@ export function AppShell() {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
-      if (event.key === 'PageDown') {
+      if (event.key === 'PageDown' || event.key === 'ArrowRight') {
         event.preventDefault();
         goNext();
-      } else if (event.key === 'PageUp') {
+      } else if (event.key === 'PageUp' || event.key === 'ArrowLeft') {
         event.preventDefault();
         goPrev();
       }
@@ -326,7 +362,7 @@ export function AppShell() {
         <div className="book-topbar-right">
           <span className="book-desk-chip hidden sm:inline-flex">
             <BookOpen size={13} />
-            账本模式 · 上下翻页
+            账本模式 · 左右翻页
           </span>
           <span className="book-desk-chip is-accent" data-testid="book-page-chip">{pageLabel}</span>
         </div>
@@ -353,8 +389,8 @@ export function AppShell() {
                 title={`${item.label} · 第 ${index + 1} 页`}
                 data-testid={`book-tab-${tabSlug(item.to)}`}
               >
-                <item.icon size={16} strokeWidth={1.9} />
-                <span>{String(index + 1).padStart(2, '0')}</span>
+                <item.icon size={15} strokeWidth={1.9} />
+                <span className="book-tab-no">{String(index + 1).padStart(2, '0')}</span>
                 <span className="book-tab-label">{item.label}</span>
               </button>
             ))}
@@ -381,7 +417,7 @@ export function AppShell() {
               title={prevPage ? `上一页：${prevPage.label}` : '已是第一页'}
               data-testid="book-prev"
             >
-              <ChevronUp size={16} />
+              <ChevronLeft size={16} />
             </button>
             <p className="book-pageno">
               <span className="book-pageno-rule" aria-hidden="true" />
@@ -398,7 +434,7 @@ export function AppShell() {
               title={nextPage ? `下一页：${nextPage.label}` : '已是最后一页'}
               data-testid="book-next"
             >
-              <ChevronDown size={16} />
+              <ChevronRight size={16} />
             </button>
           </div>
         </div>
@@ -406,7 +442,7 @@ export function AppShell() {
 
       <nav className="book-mobile-bar lg:hidden" aria-label="账本翻页">
         <button type="button" className="book-mobile-step" onClick={goPrev} disabled={!prevPage} aria-label={prevPage ? `上一页：${prevPage.label}` : '已是第一页'}>
-          <ChevronUp size={18} />
+          <ChevronLeft size={18} />
           <span>上一页</span>
         </button>
         <button type="button" className="book-mobile-toc" onClick={() => setTocOpen(true)} data-testid="book-toc">
@@ -414,7 +450,7 @@ export function AppShell() {
           <span>目录 · {currentMeta.label}</span>
         </button>
         <button type="button" className="book-mobile-step" onClick={goNext} disabled={!nextPage} aria-label={nextPage ? `下一页：${nextPage.label}` : '已是最后一页'}>
-          <ChevronDown size={18} />
+          <ChevronRight size={18} />
           <span>下一页</span>
         </button>
       </nav>

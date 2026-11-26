@@ -20,6 +20,24 @@ export const RECOVERY_QUESTIONS = [
   '我最喜欢的一本书是什么？',
 ] as const;
 
+export const CUSTOM_RECOVERY_QUESTION = '__custom__';
+export const RECOVERY_QUESTION_MAX_CHARS = 40;
+
+export function isPresetRecoveryQuestion(question: string): boolean {
+  return (RECOVERY_QUESTIONS as readonly string[]).includes(question);
+}
+
+export function validateRecoveryQuestion(question: string): string | null {
+  const length = [...question.replace(/\s+/g, ' ').trim()].length;
+  if (length < 2 || length > RECOVERY_QUESTION_MAX_CHARS) return '找回问题需为 2–40 个字符';
+  return null;
+}
+
+export function resolveRecoveryQuestion(selection: string, custom: string): string {
+  if (selection !== CUSTOM_RECOVERY_QUESTION) return selection;
+  return custom.replace(/\s+/g, ' ').trim();
+}
+
 export interface RegistrationDetails {
   phone?: string;
   question: string;

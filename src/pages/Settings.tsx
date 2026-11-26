@@ -1,7 +1,14 @@
 import { useState, type CSSProperties } from 'react';
 import { CalendarRange, Check, HelpCircle, Info, KeyRound, Landmark, Palette, Plus, Save, Settings2, ShieldCheck, Smartphone, Sparkles, Trash2, UserRound } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import { RECOVERY_QUESTIONS } from '../data/auth';
+import {
+  CUSTOM_RECOVERY_QUESTION,
+  RECOVERY_QUESTIONS,
+  RECOVERY_QUESTION_MAX_CHARS,
+  isPresetRecoveryQuestion,
+  resolveRecoveryQuestion,
+  validateRecoveryQuestion,
+} from '../data/auth';
 import { addDaysISO, formatCN, todayISO } from '../domain/days';
 import { formatMoney, parseMoneyInput } from '../domain/money';
 import { validateCoverage } from '../domain/ledger';
@@ -81,7 +88,15 @@ export function SettingsPage() {
   const [pwdError, setPwdError] = useState<string | null>(null);
   const [pwdSaving, setPwdSaving] = useState(false);
   const [recCurrentPwd, setRecCurrentPwd] = useState('');
-  const [recQuestion, setRecQuestion] = useState(user?.recoveryQuestion ?? '');
+  const [recQuestion, setRecQuestion] = useState(() => {
+    const current = user?.recoveryQuestion ?? '';
+    if (!current) return '';
+    return isPresetRecoveryQuestion(current) ? current : CUSTOM_RECOVERY_QUESTION;
+  });
+  const [recCustomQuestion, setRecCustomQuestion] = useState(() => {
+    const current = user?.recoveryQuestion ?? '';
+    return current && !isPresetRecoveryQuestion(current) ? current : '';
+  });
   const [recAnswer, setRecAnswer] = useState('');
   const [recError, setRecError] = useState<string | null>(null);
   const [recSaving, setRecSaving] = useState(false);
@@ -231,11 +246,14 @@ export function SettingsPage() {
 
   const submitRecovery = async () => {
     setRecError(null);
-    if (!recQuestion) return setRecError('请选择找回问题');
+    if (!recQuestion) return setRecError('请选择或填写找回问题');
+    const question = resolveRecoveryQuestion(recQuestion, recCustomQuestion);
+    const questionError = validateRecoveryQuestion(question);
+    if (questionError) return setRecError(questionError);
     if (!recCurrentPwd) return setRecError('请填写当前密码以验证身份');
     if (recAnswer.trim().length < 2 || recAnswer.trim().length > 40) return setRecError('找回答案需为 2–40 个字符');
     setRecSaving(true);
-    const message = await updateRecovery(recCurrentPwd, recQuestion, recAnswer);
+    const message = await updateRecovery(recCurrentPwd, question, recAnswer);
     setRecSaving(false);
     if (message) return setRecError(message);
     setRecCurrentPwd('');
@@ -427,8 +445,22 @@ export function SettingsPage() {
                 {RECOVERY_QUESTIONS.map((q) => (
                   <option key={q} value={q}>{q}</option>
                 ))}
+                <option value={CUSTOM_RECOVERY_QUESTION}>自定义问题…</option>
               </select>
             </Field>
+            {recQuestion === CUSTOM_RECOVERY_QUESTION && (
+              <Field label="自定义问题" hint="2–40 个字符；请设置只有你自己知道答案的问题。">
+                <input
+                  className="input fade-in"
+                  value={recCustomQuestion}
+                  maxLength={RECOVERY_QUESTION_MAX_CHARS}
+                  autoComplete="off"
+                  onChange={(e) => setRecCustomQuestion(e.target.value)}
+                  placeholder="例如：我小时候养的金鱼叫什么名字？"
+                  data-testid="recovery-custom-question"
+                />
+              </Field>
+            )}
             <Field label="答案" hint="2–40 个字符，大小写不敏感；答案会加盐哈希，不会明文保存。">
               <input
                 className="input"

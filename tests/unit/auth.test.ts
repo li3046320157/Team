@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CUSTOM_RECOVERY_QUESTION,
+  isPresetRecoveryQuestion,
   normalizePhone,
   personalDbNameFor,
+  resolveRecoveryQuestion,
   validateAdminPassword,
   validateCredentials,
   validateNewPassword,
   validateRecoveryAnswer,
+  validateRecoveryQuestion,
 } from '../../src/data/auth';
 
 describe('登录与注册凭据校验', () => {
@@ -58,6 +62,22 @@ describe('手机号与找回答案', () => {
     expect(validateRecoveryAnswer(' 小白 ')).toBeNull();
     expect(validateRecoveryAnswer('白')).not.toBeNull();
     expect(validateRecoveryAnswer('长'.repeat(41))).not.toBeNull();
+  });
+});
+
+describe('自定义找回问题', () => {
+  it('预设问题可识别，自定义问题按 2–40 个字符校验', () => {
+    expect(isPresetRecoveryQuestion('我的第一只宠物叫什么名字？')).toBe(true);
+    expect(isPresetRecoveryQuestion('我小时候养的金鱼叫什么名字？')).toBe(false);
+    expect(validateRecoveryQuestion('我小时候养的金鱼叫什么名字？')).toBeNull();
+    expect(validateRecoveryQuestion('  两 个 字  ')).toBeNull();
+    expect(validateRecoveryQuestion('问')).not.toBeNull();
+    expect(validateRecoveryQuestion('长'.repeat(41))).not.toBeNull();
+  });
+
+  it('自定义选项解析时去除首尾空白，预设选项原样保留', () => {
+    expect(resolveRecoveryQuestion(CUSTOM_RECOVERY_QUESTION, '  我最喜欢的书？ ')).toBe('我最喜欢的书？');
+    expect(resolveRecoveryQuestion('我的第一只宠物叫什么名字？', '  忽略这段 ')).toBe('我的第一只宠物叫什么名字？');
   });
 });
 
