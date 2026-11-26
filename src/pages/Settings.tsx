@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { CalendarRange, Check, HelpCircle, Info, KeyRound, Landmark, Palette, Plus, Save, Settings2, ShieldCheck, Smartphone, Sparkles, Trash2, UserRound, UserX } from 'lucide-react';
+import { Bell, CalendarArrowDown, CalendarRange, Check, HelpCircle, Info, KeyRound, Landmark, Palette, Plus, Save, Settings2, ShieldCheck, Smartphone, Sparkles, Trash2, UserRound, UserX } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import {
   CUSTOM_RECOVERY_QUESTION,
@@ -12,6 +12,9 @@ import {
 import { addDaysISO, formatCN, todayISO } from '../domain/days';
 import { formatMoney, parseMoneyInput } from '../domain/money';
 import { validateCoverage } from '../domain/ledger';
+import { buildICS } from '../domain/ics';
+import { downloadTextFile } from '../domain/csv';
+import { loadReminderPrefs, notificationPermission, requestNotificationPermission, saveReminderPrefs, type ReminderPrefs } from '../services/reminders';
 import { wipeAllLocalData } from '../data/wipe';
 import type { AccountType, CoverageInterval } from '../domain/types';
 import { Badge, Button, Card, Field, InfoNote, Modal, Money, PageHeader, Segmented, Switch, cn } from '../components/ui';
@@ -33,10 +36,10 @@ function intervalDays(c: CoverageInterval): number {
 
 export function SettingsPage() {
   const dataset = useAppStore((s) => s.dataset)!;
+  const user = useAppStore((s) => s.user);
   const apply = useAppStore((s) => s.apply);
   const addAccountAction = useAppStore((s) => s.addAccount);
   const notify = useAppStore((s) => s.notify);
-  const user = useAppStore((s) => s.user);
   const updateProfile = useAppStore((s) => s.updateProfile);
   const bindPhone = useAppStore((s) => s.bindPhone);
   const changePassword = useAppStore((s) => s.changePassword);
@@ -51,6 +54,8 @@ export function SettingsPage() {
     setMotionState(level);
     notify(level === 'full' ? '已切换为完整动效' : '已切换为精简动效', 'success');
   };
+  const [prefs, setPrefs] = useState<ReminderPrefs>(() => loadReminderPrefs(user?.id ?? ''));
+  const [perm, setPerm] = useState<NotificationPermission | 'unsupported'>(() => notificationPermission());
   const [safety, setSafety] = useState(s.safetyReserve ? (s.safetyReserve / 100).toFixed(2) : '');
   const [budget, setBudget] = useState(s.budget.monthVariableBudget ? (s.budget.monthVariableBudget / 100).toFixed(2) : '');
   const [savingsCap, setSavingsCap] = useState(s.budget.monthlySavingsCap ? (s.budget.monthlySavingsCap / 100).toFixed(2) : '');
@@ -296,6 +301,28 @@ export function SettingsPage() {
     notify('找回问题已保存，忘记密码时可自助重置', 'success');
   };
 
+  const updatePrefs = (patch: Partial<ReminderPrefs>) => {
+    const next = { ...prefs, ...patch };
+    setPrefs(next);
+    saveReminderPrefs(user?.id ?? '', next);
+  };
+
+  const enablePermission = async () => {
+    const result = await requestNotificationPermission();
+    setPerm(result);
+    if (result === 'granted') updatePrefs({ notifyOnOpen: true });
+  };
+
+  const exportICS = () => {
+    const content = buildICS({
+      flows: dataset.flows,
+      records: dataset.occurrenceRecords,
+      today,
+      accounts: dataset.accounts,
+    });
+    downloadTextFile(`moneyflow-reminders-${today}.ics`, content, 'text/calendar;charset=utf-8');
+  };
+
   return (
     <div className="fade-in" data-testid="settings">
       <PageHeader
@@ -336,7 +363,48 @@ export function SettingsPage() {
           </div>
         </Card>
 
-        <Card className="rise" style={{ '--i': 1 } as CSSProperties} title="账户" subtitle="账户期初 + 交易 = 余额；归档账户不影响历史">
+        <Card className="rise" style={{ '--i': 1 } as CSSProperties} title="到期提醒" subtitle="打开应用时通知 + 日历兜底，双保险" action={<Bell size={15} className="text-[#0B6357]" />}>
+          <div className="space-y-3.5">
+            <label className="flex cursor-pointer items-center justify-between rounded-lg border border-[#E4E0D8] bg-[#FCFBF8] px-3 py-2.5">
+              <span>
+                <span className="flex items-center gap-1.5 text-[12.5px] font-medium"><Bell size={13} className="text-[#0B6357]" /> 到期提醒</span>
+                <span className="mt-0.5 block text-[10.5px] leading-relaxed text-[#8A887F]">有逾期或今日到期的固定支出时，侧栏「计划」显示数量徽标。此项立即生效，无需点底部保存。</span>
+              </span>
+              <span data-testid="reminder-enabled"><Switch checked={prefs.enabled} onChange={(v) => updatePrefs({ enabled: v })} aria-label="到期提醒" /></span>
+            </label>
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-[#E4E0D8] bg-[#FCFBF8] px-3 py-2.5">
+              <span className="text-[12.5px] font-medium">
+                通知权限：
+                {perm === 'granted' ? <span className="text-[#0B6357]">已允许</span> : perm === 'denied' ? <span className="text-[#98362E]">已拒绝</span> : perm === 'unsupported' ? <span>浏览器不支持</span> : <span className="text-[#B7791F]">未授权</span>}
+              </span>
+              {perm === 'default' && (
+                <Button size="xs" variant="secondary" onClick={() => void enablePermission()} data-testid="enable-notification">开启系统通知</Button>
+              )}
+            </div>
+            {perm === 'denied' && <p className="text-[10.5px] leading-relaxed text-[#8A887F]">通知已被拒绝：到浏览器地址栏的站点设置里恢复后再试；期间仍可用日历提醒。</p>}
+            {perm === 'unsupported' && <p className="text-[10.5px] leading-relaxed text-[#8A887F]">当前浏览器不支持系统通知，仍可导出日历使用手机提醒。</p>}
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[12.5px] font-medium">提前提醒</span>
+              <Segmented
+                value={String(prefs.advanceDays)}
+                onChange={(v) => updatePrefs({ advanceDays: Number(v) as 0 | 1 | 3 })}
+                options={[
+                  { value: '0', label: '当天' },
+                  { value: '1', label: '提前 1 天' },
+                  { value: '3', label: '提前 3 天' },
+                ]}
+              />
+            </div>
+            <div className="space-y-1.5 border-t border-[#EFECE6] pt-3">
+              <Button variant="secondary" size="sm" onClick={exportICS} data-testid="export-ics"><CalendarArrowDown size={13} /> 导出日历（.ics）</Button>
+              <p className="text-[10.5px] leading-relaxed text-[#8A887F]">导出未来 90 天待处理的固定支出；导入手机日历后由系统按时提醒，即使不打开应用。</p>
+            </div>
+            <InfoNote>仅在打开应用时发送系统通知；浏览器完全关闭后不会推送。</InfoNote>
+            <InfoNote>提醒不改变任何账本数据，仍以「计划」页的核销状态为准。</InfoNote>
+          </div>
+        </Card>
+
+        <Card className="rise" style={{ '--i': 2 } as CSSProperties} title="账户" subtitle="账户期初 + 交易 = 余额；归档账户不影响历史">
           <ul className="space-y-2">
             {dataset.accounts.map((acc) => (
               <li key={acc.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#EFECE6] px-3 py-2">
@@ -536,7 +604,7 @@ export function SettingsPage() {
           <p className="mt-2 text-[10.5px] text-[#8A887F]">合计覆盖 {coveredDays} 天 · 区间不可重叠、不可包含今天或未来 · 修改后需保存。</p>
         </Card>
 
-        <Card className="rise" style={{ '--i': 3 } as CSSProperties} title="小额消费聚合" subtitle="把高频小钱汇总起来看，避免「每笔都不贵」的错觉" action={<Info size={15} className="text-[#B7791F]" />}>
+        <Card className="rise" style={{ '--i': 4 } as CSSProperties} title="小额消费聚合" subtitle="把高频小钱汇总起来看，避免「每笔都不贵」的错觉" action={<Info size={15} className="text-[#B7791F]" />}>
           <div className="grid grid-cols-2 gap-3">
             <Field label="小额阈值（元）"><input className="input num" inputMode="decimal" value={smallThreshold} onChange={(e) => setSmallThreshold(e.target.value)} /></Field>
             <Field label="统计窗口（天）"><input className="input num" type="number" min={1} max={365} value={smallWindow} onChange={(e) => setSmallWindow(e.target.value)} /></Field>
@@ -546,7 +614,7 @@ export function SettingsPage() {
           </p>
         </Card>
 
-        <Card className="rise" style={{ '--i': 4 } as CSSProperties} title="异常消费检测" subtitle="基于同分类历史池的 MAD 稳健 Z 分数 + IQR 兜底">
+        <Card className="rise" style={{ '--i': 5 } as CSSProperties} title="异常消费检测" subtitle="基于同分类历史池的 MAD 稳健 Z 分数 + IQR 兜底">
           <div className="grid grid-cols-3 gap-3">
             <Field label="历史窗口（天）"><input className="input num" type="number" min={7} max={730} value={anomalyWindow} onChange={(e) => setAnomalyWindow(e.target.value)} /></Field>
             <Field label="最少样本"><input className="input num" type="number" min={3} max={100} value={anomalySamples} onChange={(e) => setAnomalySamples(e.target.value)} /></Field>
@@ -557,7 +625,7 @@ export function SettingsPage() {
           </p>
         </Card>
 
-        <Card className="rise" style={{ '--i': 5 } as CSSProperties} title="周期收支识别" subtitle="商户 + 金额稳定 + 间隔规律的候选计划">
+        <Card className="rise" style={{ '--i': 6 } as CSSProperties} title="周期收支识别" subtitle="商户 + 金额稳定 + 间隔规律的候选计划">
           <div className="grid grid-cols-2 gap-3">
             <Field label="间隔容差（天）"><input className="input num" type="number" min={1} max={15} value={recurringTol} onChange={(e) => setRecurringTol(e.target.value)} /></Field>
             <Field label="金额波动上限（%）"><input className="input num" type="number" min={1} max={100} value={recurringCv} onChange={(e) => setRecurringCv(e.target.value)} /></Field>

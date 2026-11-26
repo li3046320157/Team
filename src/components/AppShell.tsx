@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, type Location } from 'react-router-dom';
 import {
   BookOpen,
@@ -25,6 +25,9 @@ import { AccountMenu } from './AccountMenu';
 import { PageAtmosphere } from './PageAtmosphere';
 import { SectionMascot } from './SectionMascot';
 import { LedgerIntro } from './LedgerIntro';
+import { todayISO } from '../domain/days';
+import { collectReminders } from '../domain/reminders';
+import { loadReminderPrefs, notifyIfDue, saveReminderPrefs } from '../services/reminders';
 import { cn } from './ui';
 import { DashboardPage } from '../pages/Dashboard';
 import { LedgerPage } from '../pages/Ledger';
@@ -211,6 +214,9 @@ function BookLeaf({
 export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
+  const user = useAppStore((s) => s.user);
+  const mode = useAppStore((s) => s.mode);
+  const dataset = useAppStore((s) => s.dataset);
   const introPending = useAppStore((s) => s.introPending);
   const [leaves, setLeaves] = useState<LeafState[]>(() => [{ id: 0, location }]);
   const [tocOpen, setTocOpen] = useState(false);
@@ -226,6 +232,35 @@ export function AppShell() {
   const currentPos = pageIndex(location.pathname);
   const prevPage = currentPos > 0 ? pageMeta(FLIP_SEQUENCE[currentPos - 1]) : null;
   const nextPage = currentPos < FLIP_SEQUENCE.length - 1 ? pageMeta(FLIP_SEQUENCE[currentPos + 1]) : null;
+
+  const dueCount = useMemo(() => {
+    if (!dataset) return 0;
+    const buckets = collectReminders({ flows: dataset.flows, records: dataset.occurrenceRecords, today: todayISO() });
+    return buckets.overdue.length + buckets.dueToday.length;
+  }, [dataset]);
+
+  useEffect(() => {
+    if (!user || !dataset) return;
+    const check = () => {
+      if (document.hidden || mode === 'demo') return;
+      const today = todayISO();
+      const prefs = loadReminderPrefs(user.id);
+      const buckets = collectReminders({
+        flows: dataset.flows,
+        records: dataset.occurrenceRecords,
+        today,
+        advanceDays: prefs.advanceDays,
+      });
+      const next = notifyIfDue({ prefs, buckets, today, onClick: () => navigate('/schedules') });
+      saveReminderPrefs(user.id, next);
+    };
+    const first = setTimeout(check, 1200);
+    const timer = setInterval(check, 60_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, [user, dataset, mode, navigate]);
 
   const goTo = useCallback((to: string) => {
     navigate(to);
@@ -392,6 +427,9 @@ export function AppShell() {
                 <item.icon size={15} strokeWidth={1.9} />
                 <span className="book-tab-no">{String(index + 1).padStart(2, '0')}</span>
                 <span className="book-tab-label">{item.label}</span>
+                {item.to === '/schedules' && dueCount > 0 && (
+                  <span data-testid="schedules-badge" className="rounded-full bg-[#98362E] px-1.5 py-0.5 text-[10px] font-semibold text-white">{dueCount > 99 ? '99+' : dueCount}</span>
+                )}
               </button>
             ))}
           </nav>
@@ -445,9 +483,10 @@ export function AppShell() {
           <ChevronLeft size={18} />
           <span>上一页</span>
         </button>
-        <button type="button" className="book-mobile-toc" onClick={() => setTocOpen(true)} data-testid="book-toc">
+        <button type="button" className="relative book-mobile-toc" onClick={() => setTocOpen(true)} data-testid="book-toc">
           <BookOpen size={17} />
           <span>目录 · {currentMeta.label}</span>
+          {dueCount > 0 && <span data-testid="schedules-dot" className="absolute right-2 top-1.5 h-2 w-2 rounded-full bg-[#98362E]" />}
         </button>
         <button type="button" className="book-mobile-step" onClick={goNext} disabled={!nextPage} aria-label={nextPage ? `下一页：${nextPage.label}` : '已是最后一页'}>
           <ChevronRight size={18} />
@@ -482,6 +521,9 @@ export function AppShell() {
                 >
                   <item.icon size={16} />
                   <span className="flex-1 text-left">{item.label}</span>
+                  {item.to === '/schedules' && dueCount > 0 && (
+                    <span className="rounded-full bg-[#98362E] px-1.5 py-0.5 text-[10px] font-semibold text-white">{dueCount > 99 ? '99+' : dueCount}</span>
+                  )}
                   <em>{String(index + 1).padStart(2, '0')}</em>
                 </button>
               ))}

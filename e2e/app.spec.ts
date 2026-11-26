@@ -494,6 +494,34 @@ test('移动端：账本翻页栏与目录抽屉可进入计划页', async ({ br
   await mobile.close();
 });
 
+test('到期提醒：逾期计划出现导航徽标，设置可开启提醒并导出 .ics', async () => {
+  await page.goto('/#/schedules');
+  await expect(page.getByTestId('schedules')).toBeVisible();
+  const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const pastDate = `${twoDaysAgo.getFullYear()}-${pad(twoDaysAgo.getMonth() + 1)}-${pad(twoDaysAgo.getDate())}`;
+  await page.getByRole('button', { name: '新建计划' }).first().click();
+  const form = page.getByRole('dialog', { name: '新建固定计划' });
+  await form.getByLabel('名称').fill('E2E 到期提醒');
+  await form.getByLabel('金额（元）').fill('88.88');
+  await form.getByLabel('开始日期').fill(pastDate);
+  await form.locator('select').nth(1).selectOption({ index: 1 });
+  await form.locator('select').nth(2).selectOption({ value: 'day' });
+  await form.getByRole('button', { name: '保存计划' }).click();
+  await expect(page.getByRole('status')).toContainText('计划已创建');
+  await expect(page.getByTestId('schedules-badge')).toHaveText('3');
+
+  await page.goto('/#/settings');
+  await expect(page.getByTestId('settings')).toBeVisible();
+  await page.getByTestId('reminder-enabled').click();
+  await expect(page.getByTestId('reminder-enabled').getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByTestId('export-ics').click(),
+  ]);
+  expect(download.suggestedFilename()).toContain('.ics');
+});
+
 test('数据不足：新开户未登记覆盖区间时预测与沙盘显示数据不足', async ({ browser }) => {
   const own = await browser.newContext();
   const ownPage = await own.newPage();

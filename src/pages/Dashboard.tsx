@@ -158,9 +158,10 @@ export function DashboardPage() {
       today,
     );
     const tasks = views.filter((v) => v.status === 'pending' && v.dueDate <= today);
+    const overdue = tasks.filter((t) => t.overdue);
     const upcoming = views.filter((v) => v.status === 'pending' && v.dueDate > today).slice(0, 5);
     const goals = goalViews(dataset.goals, dataset.goalEvents, today).filter((g) => g.goal.status === 'active');
-    return { balance, reserved, free, tasks, upcoming, goals };
+    return { balance, reserved, free, tasks, overdue, upcoming, goals };
   }, [dataset, today]);
 
   const periodData = useMemo(() => {
@@ -475,6 +476,11 @@ export function DashboardPage() {
                     {summary.tasks.length > 4 && (
                       <li className="pt-1 text-center">
                         <Link to="/schedules" className="text-[11.5px] font-medium text-[var(--accent-ink)] hover:underline">其余 {summary.tasks.length - 4} 项</Link>
+                      </li>
+                    )}
+                    {summary.overdue.length > 0 && (
+                      <li className="border-t border-[#EFECE6] pt-2 text-center">
+                        <Link to="/schedules" className="text-[11.5px] font-medium text-[#98362E] hover:underline">另有 {summary.overdue.length} 笔逾期，点此批量处理</Link>
                       </li>
                     )}
                   </ul>
