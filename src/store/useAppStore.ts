@@ -3,7 +3,21 @@ import { create } from 'zustand';
 import type { Dataset, DataMode } from '../domain/types';
 import { todayISO } from '../domain/days';
 import { clearDataset, describeDbError, readDataset, writeDataset, setPersonalDbName } from '../data/db';
-import { changeUserPassword, clearSession, getUserById, loginUser, personalDbNameFor, readSession, registerUser, storeSession, updateUsername, type AuthUser } from '../data/auth';
+import {
+  changeUserPassword,
+  clearSession,
+  getUserById,
+  loginUser,
+  personalDbNameFor,
+  readSession,
+  registerUser,
+  storeSession,
+  updateRecoverySetup,
+  updateUsername,
+  updateUserPhone,
+  type AuthUser,
+  type RegistrationDetails,
+} from '../data/auth';
 import { createEmptyDataset } from '../data/defaults';
 import { applyCleanSlateOnce } from '../data/wipe';
 import { addAccount, applyOnboarding, type AccountInput } from '../services/mutations';
@@ -26,10 +40,12 @@ interface AppState {
   error: string | null;
   toast: Toast | null;
   boot: () => Promise<void>;
-  register: (username: string, password: string) => Promise<string | null>;
-  login: (username: string, password: string) => Promise<string | null>;
+  register: (username: string, password: string, details: RegistrationDetails) => Promise<string | null>;
+  login: (identifier: string, password: string) => Promise<string | null>;
   updateProfile: (username: string) => Promise<string | null>;
+  bindPhone: (phone: string) => Promise<string | null>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<string | null>;
+  updateRecovery: (currentPassword: string, question: string, answer: string) => Promise<string | null>;
   logout: () => void;
   init: () => Promise<void>;
   apply: (mutator: (dataset: Dataset) => Dataset, successMessage?: string) => Promise<boolean>;
@@ -113,18 +129,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (user) await get().init();
   },
 
-  register: async (username, password) => {
+  register: async (username, password, details) => {
     try {
-      await registerUser(username, password);
+      await registerUser(username, password, details);
       return null;
     } catch (error) {
       return error instanceof Error ? error.message : '注册失败，请重试';
     }
   },
 
-  login: async (username, password) => {
+  login: async (identifier, password) => {
     try {
-      const user = await loginUser(username, password);
+      const user = await loginUser(identifier, password);
       setPersonalDbName(personalDbNameFor(user.id));
       storeSession(user.id);
       set({ user, error: null });
@@ -148,6 +164,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  bindPhone: async (phone) => {
+    const state = get();
+    if (!state.user) return '请先登录';
+    try {
+      const user = await updateUserPhone(state.user.id, phone);
+      set({ user });
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : '绑定手机号失败，请重试';
+    }
+  },
+
   changePassword: async (currentPassword, newPassword) => {
     const state = get();
     if (!state.user) return '请先登录';
@@ -156,6 +184,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       return null;
     } catch (error) {
       return error instanceof Error ? error.message : '修改密码失败，请重试';
+    }
+  },
+
+  updateRecovery: async (currentPassword, question, answer) => {
+    const state = get();
+    if (!state.user) return '请先登录';
+    try {
+      const user = await updateRecoverySetup(state.user.id, currentPassword, question, answer);
+      set({ user });
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : '保存找回问题失败，请重试';
     }
   },
 

@@ -429,7 +429,8 @@ table.data tbody tr:hover {
 .auth-scene {
   position: relative;
   min-height: 100vh;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   cursor: var(--pen-cursor);
   background:
     radial-gradient(900px 620px at 18% 12%, rgba(var(--accent-rgb), 0.12), transparent 62%),
