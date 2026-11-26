@@ -36,6 +36,21 @@ export interface ForecastRisk {
   end90: Cents;
 }
 
+export type DataSufficiency = 'insufficient' | 'limited' | 'ok';
+
+export interface DataSufficiencyInfo {
+  level: DataSufficiency;
+  coveredDays: number;
+  trainingDays: number;
+  budget: Cents;
+  reason: string;
+}
+
+export const MIN_COVERED_DAYS = 7;
+export const MIN_TRAINING_DAYS = 7;
+export const COMFORT_TRAINING_DAYS = 14;
+export const COMFORT_COVERED_DAYS = 30;
+
 export interface ForecastDataset {
   accounts: Account[];
   transactions: Transaction[];
@@ -65,6 +80,7 @@ export interface ForecastResult {
   days: ForecastDay[];
   todayEnd: Cents;
   risk: ForecastRisk;
+  sufficiency: DataSufficiencyInfo;
   model: VariableModel;
   summary: ForecastInputsSummary;
   startBalance: Cents;
@@ -287,6 +303,25 @@ export function runForecast(params: ForecastParams): ForecastResult {
     budget: settings.budget.monthVariableBudget,
   };
 
+  const sufficiency: DataSufficiencyInfo = (() => {
+    let level: DataSufficiency;
+    let reason: string;
+    if (coveredCount < MIN_COVERED_DAYS) {
+      level = 'insufficient';
+      reason = coveredCount === 0 ? '尚未登记历史覆盖区间' : `历史覆盖不足 ${MIN_COVERED_DAYS} 天`;
+    } else if (model.trainingDayCount < MIN_TRAINING_DAYS && settings.budget.monthVariableBudget === 0) {
+      level = 'insufficient';
+      reason = '历史样本不足，且未设置月可变预算';
+    } else if (model.trainingDayCount < COMFORT_TRAINING_DAYS || coveredCount < COMFORT_COVERED_DAYS) {
+      level = 'limited';
+      reason = '样本偏少，结论精度有限';
+    } else {
+      level = 'ok';
+      reason = '';
+    }
+    return { level, coveredDays: coveredCount, trainingDays: model.trainingDayCount, budget: settings.budget.monthVariableBudget, reason };
+  })();
+
   assumptions.push('首版不估计当天还会发生的零散可变消费，今日日终只含已记录交易和待付计划');
   assumptions.push('同日固定收入与支出按“支出先于收入到账”的保守顺序检查覆盖能力；日终按净额计算');
   if (model.avgDaily === null && settings.budget.monthVariableBudget === 0) {
@@ -298,6 +333,7 @@ export function runForecast(params: ForecastParams): ForecastResult {
     days,
     todayEnd,
     risk,
+    sufficiency,
     model,
     summary,
     startBalance,

@@ -1,6 +1,7 @@
 import { formatMoney } from '../domain/money';
 import type { FreqUnit, ISODate, TxnKind, TxnNature } from '../domain/types';
 import { formatCN } from '../domain/days';
+import type { DataSufficiencyInfo, ForecastRisk } from '../domain/forecasting/engine';
 
 export { formatMoney };
 
@@ -42,8 +43,20 @@ export function pct(value: number, digits = 0): string {
   return `${(value * 100).toFixed(digits)}%`;
 }
 
-export function riskText(level: 'safe' | 'warning' | 'danger'): string {
-  return level === 'danger' ? '可能透支' : level === 'warning' ? '低于安全线' : '现金流安全';
+export type RiskLevel = 'unknown' | 'safe' | 'warning' | 'danger';
+
+export function riskLevelOf(input: { risk: ForecastRisk; sufficiency: DataSufficiencyInfo }): RiskLevel {
+  if (input.sufficiency.level === 'insufficient') return 'unknown';
+  if (input.risk.firstNegative) return 'danger';
+  if (input.risk.firstBelowSafety) return 'warning';
+  return 'safe';
+}
+
+export function riskText(level: RiskLevel): string {
+  if (level === 'danger') return '可能透支';
+  if (level === 'warning') return '低于安全线';
+  if (level === 'unknown') return '数据不足';
+  return '现金流安全';
 }
 
 export function amountInputValue(cents: number | undefined): string {

@@ -6,6 +6,7 @@ import { useAppStore } from '../store/useAppStore';
 import { addDaysISO, formatCN, todayISO } from '../domain/days';
 import { parseMoneyInput } from '../domain/money';
 import { reservedByGoal } from '../domain/ledger';
+import { runForecast } from '../domain/forecasting/engine';
 import { runSandbox, riskLevelFor, type SandboxResult, type ScenarioOutcome } from '../domain/sandbox';
 import { savePlan, deletePlan, type PlanInput } from '../services/mutations';
 import { EChart } from '../components/Chart';
@@ -64,6 +65,11 @@ export function SandboxPage() {
 
   const goalReserved = goalId ? (reservedByGoal(dataset.goalEvents, today).get(goalId) ?? 0) : 0;
   const activeGoals = dataset.goals.filter((g) => g.status === 'active');
+
+  const sufficiency = useMemo(
+    () => runForecast({ asOfDate: today, horizonDays: 90, dataset, coverage: dataset.settings.coverage, settings: dataset.settings }).sufficiency,
+    [dataset, today],
+  );
 
   const run = () => {
     const parsed = parseMoneyInput(price);
@@ -231,6 +237,11 @@ export function SandboxPage() {
         </Card>
 
         <div className="space-y-4">
+          {sufficiency.level === 'insufficient' && (
+            <div className="rounded-lg border border-[#EEDCB9] bg-[#FBF4E4] px-3 py-2 text-[11.5px] leading-relaxed text-[#7A5517]">
+              <TriangleAlert size={13} className="mr-1 inline" /> 历史数据不足，四种路径只反映支出结构差异，不能当作安全结论
+            </div>
+          )}
           {!result ? (
             <Card>
               <EmptyState

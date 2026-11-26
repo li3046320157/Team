@@ -8,7 +8,7 @@ import { runForecast } from '../domain/forecasting/engine';
 import { formatMoneyShort } from '../domain/money';
 import { EChart } from '../components/Chart';
 import { Badge, Button, Card, InfoNote, Money, PageHeader, Segmented, StatCard, cn } from '../components/ui';
-import { dueLabel, riskText, weekdayCN } from '../lib/ui';
+import { dueLabel, riskLevelOf, riskText, weekdayCN } from '../lib/ui';
 import { cssColor } from '../theme/palette';
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -29,7 +29,7 @@ export function ForecastPage() {
     [dataset, today, horizon],
   );
   const risk = forecast.risk;
-  const level = risk.firstNegative ? 'danger' : risk.firstBelowSafety ? 'warning' : 'safe';
+  const level = riskLevelOf(forecast);
   const end = horizon === 30 ? risk.end30 : horizon === 60 ? risk.end60 : risk.end90;
 
   const chartDays = forecast.days.filter((d) => !d.isToday).slice(0, horizon + 1);
@@ -147,16 +147,18 @@ export function ForecastPage() {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard key={`end-${horizon}`} className="balance-pulse" label={`${horizon} 天后余额`} value={<Money cents={end} />} hint="按当前计划与消费模型推算" tone={end < 0 ? 'danger' : 'default'} />
-        <StatCard key={`min-${horizon}`} className="balance-pulse" label="预测期最低余额" value={<Money cents={risk.minBalance} />} hint={`${formatCN(risk.minBalanceDate)} · 最低可用 ${formatMoneyShort(risk.minFree)}`} tone={level === 'danger' ? 'danger' : level === 'warning' ? 'amber' : 'teal'} />
+        <StatCard key={`min-${horizon}`} className="balance-pulse" label="预测期最低余额" value={<Money cents={risk.minBalance} />} hint={`${formatCN(risk.minBalanceDate)} · 最低可用 ${formatMoneyShort(risk.minFree)}${level === 'unknown' ? ' · 样本不足，仅供参考' : ''}`} tone={level === 'danger' ? 'danger' : level === 'warning' ? 'amber' : 'teal'} />
         <StatCard
           key={`risk-${horizon}`}
           className="balance-pulse"
           label="现金流状态"
           value={<span className="text-[18px]">{riskText(level)}</span>}
           hint={
-            risk.firstBelowSafety
-              ? `${formatCN(risk.firstBelowSafety)} 首次低于安全线，共 ${risk.daysBelowSafety} 天`
-              : '预测期内不会低于安全储备'
+            level === 'unknown'
+              ? forecast.sufficiency.reason
+              : risk.firstBelowSafety
+                ? `${formatCN(risk.firstBelowSafety)} 首次低于安全线，共 ${risk.daysBelowSafety} 天`
+                : '预测期内不会低于安全储备'
           }
           tone={level === 'danger' ? 'danger' : level === 'warning' ? 'amber' : 'default'}
         />
@@ -171,7 +173,7 @@ export function ForecastPage() {
           subtitle="红线标记预测期最低点；悬停可看每日收入、固定支出与可变估计。"
           action={
             <span key={forecast.model.trainingDayCount} className="balance-pulse inline-flex">
-              <Badge tone="white">{forecast.model.trainingDayCount} 个训练日</Badge>
+              <Badge tone={level === 'unknown' ? 'amber' : 'white'}>{forecast.model.trainingDayCount} 个训练日</Badge>
             </span>
           }
         >
@@ -260,6 +262,9 @@ export function ForecastPage() {
                 <Info size={13} className="mt-0.5 shrink-0 text-[#8A887F]" /> {a}
               </li>
             ))}
+            <li className="flex items-start gap-2 text-[11.5px] leading-relaxed text-[#6B6A63]">
+              <Info size={13} className="mt-0.5 shrink-0 text-[#8A887F]" /> 历史覆盖不足时，预测不给出安全结论，只标注「未估计」。
+            </li>
             <li className="flex items-start gap-2 text-[11.5px] leading-relaxed text-[#6B6A63]">
               <CalendarClock size={13} className="mt-0.5 shrink-0 text-[#8A887F]" /> 月度计划按原始日号推进，月底自动截断，不会永久漂移。
             </li>

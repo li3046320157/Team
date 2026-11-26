@@ -493,3 +493,17 @@ test('移动端：账本翻页栏与目录抽屉可进入计划页', async ({ br
   await expect(mp.getByTestId('book-page-chip')).toContainText('03');
   await mobile.close();
 });
+
+test('数据不足：新开户未登记覆盖区间时预测与沙盘显示数据不足', async ({ browser }) => {
+  const own = await browser.newContext();
+  const ownPage = await own.newPage();
+  await loadApp(ownPage, 'e2e数据不足员');
+  await ownPage.goto('/#/forecast');
+  await expect(ownPage.getByTestId('forecast')).toBeVisible();
+  await expect(ownPage.getByText('数据不足', { exact: true })).toBeVisible();
+  await expect(ownPage.getByText('预测期内不会低于安全储备')).toHaveCount(0);
+  await ownPage.goto('/#/sandbox');
+  await expect(ownPage.getByTestId('sandbox')).toBeVisible();
+  await expect(ownPage.getByText('历史数据不足，四种路径只反映支出结构差异，不能当作安全结论')).toBeVisible();
+  await own.close();
+});

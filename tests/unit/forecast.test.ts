@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { runForecast } from '../../src/domain/forecasting/engine';
 import { assessRisk } from '../../src/domain/forecasting/engine';
+import { riskLevelOf } from '../../src/lib/ui';
 import type { Dataset } from '../../src/domain/types';
 import { makeAccount, makeCategory, makeDataset, makeFlow, makeSettings, makeTxn } from './fixtures';
 
@@ -136,5 +137,50 @@ describe('现金流预测引擎', () => {
     expect(r.risk.minBalance).toBe(1_000_000);
     expect(r.risk.minBalanceDate).toBe(asOf);
     expect(assessRisk(r.days, asOf, 0).end90).toBe(1_000_000);
+  });
+
+  it('数据不足：空数据集标记 insufficient 且风险等级为 unknown', () => {
+    const settings = makeSettings({ budget: { monthVariableBudget: 0, monthlySavingsCap: 0 }, coverage: [] });
+    const empty = makeDataset({ accounts: [], transactions: [], settings });
+    const r = run(empty, settings);
+    expect(r.sufficiency.level).toBe('insufficient');
+    expect(r.sufficiency.coveredDays).toBe(0);
+    expect(r.sufficiency.reason).toBe('尚未登记历史覆盖区间');
+    expect(riskLevelOf(r)).toBe('unknown');
+  });
+
+  it('数据充足：30 天覆盖且每日有可变支出时 level 为 ok', () => {
+    const settings = makeSettings({
+      budget: { monthVariableBudget: 0, monthlySavingsCap: 0 },
+      coverage: [{ start: '2026-06-01', end: '2026-06-30' }],
+    });
+    const txns = Array.from({ length: 30 }, (_, i) => makeTxn({ id: `d${i}`, date: `2026-06-${String(i + 1).padStart(2, '0')}` }));
+    const r = run(ds({ transactions: txns }), settings);
+    expect(r.sufficiency.level).toBe('ok');
+    expect(riskLevelOf(r)).toBe('safe');
+  });
+
+  it('覆盖 10 天、无预算且训练日不足 7 天时 insufficient', () => {
+    // 覆盖区间全部落在 6 周训练窗口之外：覆盖天数 ≥7，但实际参与训练的天数为 0
+    const settings = makeSettings({
+      budget: { monthVariableBudget: 0, monthlySavingsCap: 0 },
+      coverage: [{ start: '2026-02-01', end: '2026-02-10' }],
+    });
+    const r = run(ds(), settings);
+    expect(r.sufficiency.coveredDays).toBe(10);
+    expect(r.sufficiency.trainingDays).toBeLessThan(7);
+    expect(r.sufficiency.level).toBe('insufficient');
+    expect(r.sufficiency.reason).toBe('历史样本不足，且未设置月可变预算');
+  });
+
+  it('只有月预算、无历史覆盖时 insufficient', () => {
+    const settings = makeSettings({
+      budget: { monthVariableBudget: 150_000, monthlySavingsCap: 0 },
+      coverage: [],
+    });
+    const r = run(ds(), settings);
+    expect(r.sufficiency.level).toBe('insufficient');
+    expect(r.sufficiency.reason).toBe('尚未登记历史覆盖区间');
+    expect(riskLevelOf(r)).toBe('unknown');
   });
 });

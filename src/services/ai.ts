@@ -295,6 +295,12 @@ export function buildAnalysisContext(dataset: Dataset, mode: DataMode): string {
     lines.push(
       `未来 90 天预测：期末余额 ${yuan(risk.end90)}；最低余额 ${yuan(risk.minBalance)}（${risk.minBalanceDate}）；${risk.firstNegative ? `预计 ${risk.firstNegative} 出现负余额` : risk.firstBelowSafety ? `预计 ${risk.firstBelowSafety} 跌破安全储备线` : '预测期内不低于安全储备线'}`,
     );
+    const suf = forecast.sufficiency;
+    lines.push(
+      suf.level === 'insufficient'
+        ? `数据充足度：不足（仅覆盖 ${suf.coveredDays} 天，训练 ${suf.trainingDays} 天）；样本不足，以下结论仅供参考`
+        : `数据充足度：${suf.level === 'limited' ? '有限（样本偏少，结论精度有限）' : '良好'}（覆盖 ${suf.coveredDays} 天，训练 ${suf.trainingDays} 天）`,
+    );
   } catch {
     lines.push('预测引擎暂不可用（历史数据不足）。');
   }
