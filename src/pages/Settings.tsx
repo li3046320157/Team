@@ -226,10 +226,7 @@ export function SettingsPage() {
     setPwdSaving(false);
     if (message) return setPwdError(message);
     notify('密码已修改，请使用新密码重新登录', 'success');
-    window.setTimeout(() => {
-      logout();
-      window.location.hash = '#/login';
-    }, 900);
+    window.setTimeout(() => { void logout(); }, 900);
   };
 
   const submitRecovery = async () => {
@@ -392,7 +389,7 @@ export function SettingsPage() {
             <Button variant="primary" size="sm" onClick={() => void submitPassword()} disabled={pwdSaving} data-testid="change-password">
               <KeyRound size={13} /> {pwdSaving ? '修改中…' : '修改密码'}
             </Button>
-            <InfoNote tone="warn">密码只以加盐哈希保存在这台设备。修改后所有打开的本机标签页都需要重新登录，请妥善保管新密码。</InfoNote>
+            <InfoNote tone="warn">密码由云端账户服务加盐哈希保存。修改后所有已登录设备都需要重新登录，账本数据不受影响。</InfoNote>
           </div>
         </Card>
 
@@ -447,7 +444,7 @@ export function SettingsPage() {
             <Button variant="primary" size="sm" onClick={() => void submitRecovery()} disabled={recSaving} data-testid="save-recovery">
               <ShieldCheck size={13} /> {recSaving ? '保存中…' : '保存找回问题'}
             </Button>
-            <InfoNote>手机号与找回问题只保存在本机；回答正确后可在登录页直接设置新密码，账本数据不受影响。</InfoNote>
+            <InfoNote>手机号与找回问题保存在云端账户服务；回答正确后可在登录页直接设置新密码，本机账本不受影响。</InfoNote>
           </div>
         </Card>
 
@@ -527,19 +524,19 @@ export function SettingsPage() {
           <p className="mt-2 text-[10.5px] leading-relaxed text-[#8A887F]">偏好保存在本机，只影响当前浏览器的展示效果。</p>
         </Card>
 
-        <Card className="rise" style={{ '--i': 8 } as CSSProperties} title="本机数据" subtitle="账户、账本与 AI 配置都只存在于当前浏览器" action={<Trash2 size={15} className="text-[#98362E]" />}>
+        <Card className="rise" style={{ '--i': 8 } as CSSProperties} title="本机账本数据" subtitle="账本、目标与 AI 配置保存在当前浏览器，云端账户不受影响" action={<Trash2 size={15} className="text-[#98362E]" />}>
           <p className="text-[11.5px] leading-relaxed text-[#6B6A63]">
-            清除后会删除本机所有账户、账本、目标与 AI 接口配置，并回到登录页；此操作无法撤销，请先到数据中心导出备份。
+            清除后会删除本机账本、目标与 AI 接口配置，并重新进入空账本；云端账户仍保留，可在其他设备继续登录。此操作无法撤销，请先到数据中心导出备份。
           </p>
           <Button variant="danger" size="sm" className="mt-3" onClick={() => setWipeOpen(true)} data-testid="wipe-local-data">
-            <Trash2 size={13} /> 清除本机全部数据
+            <Trash2 size={13} /> 清除本机账本数据
           </Button>
         </Card>
 
         <Card className="rise" style={{ '--i': 9 } as CSSProperties} title="关于与数据原则" subtitle="金钱流水 · 本地优先的个人现金流工作台" action={<Settings2 size={15} className="text-[#8A887F]" />}>
           <ul className="space-y-2 text-[11.5px] leading-relaxed text-[#6B6A63]">
             <li>版本 1.0.0 · 数据格式 v1 · 设置版本 v{s.settingsVersion}</li>
-            <li>所有数据存于浏览器 IndexedDB，不上传；备份文件由你自行保管。</li>
+            <li>账户资料、手机号与登录记录保存在云端账户服务；账本流水、备份与 AI 配置保存在浏览器，不上传。</li>
             <li>金额一律整数分；日期一律本地 YYYY-MM-DD，避免时区漂移。</li>
             <li>预测快照不可修改，用于事后校准与滚动回测；校准只影响未来预测。</li>
             <li>退出登录不会删除本机数据；彻底重置请使用下方「清除本机全部数据」。</li>
@@ -549,7 +546,8 @@ export function SettingsPage() {
             <Badge tone="teal">TypeScript</Badge>
             <Badge tone="teal">IndexedDB</Badge>
             <Badge tone="teal">ECharts</Badge>
-            <Badge tone="teal">无云端</Badge>
+            <Badge tone="teal">账户云端</Badge>
+            <Badge tone="teal">账本本地</Badge>
           </div>
           <InfoNote>
             设置保存后会立即影响预测与洞察，但不会篡改历史交易或已保存的预测快照；旧快照仍以生成时参数为准。
@@ -592,8 +590,8 @@ export function SettingsPage() {
 
       <Modal
         open={wipeOpen}
-        title="清除本机全部数据？"
-        subtitle="所有账户、账本、目标与 AI 配置都会被永久删除。"
+        title="清除本机账本数据？"
+        subtitle="本机账本、目标与 AI 配置会被永久删除，云端账户保留。"
         onClose={() => setWipeOpen(false)}
         footer={(
           <>
@@ -605,7 +603,7 @@ export function SettingsPage() {
         )}
       >
         <p className="text-[12px] leading-relaxed text-[#6B6A63]">
-          清除后会回到登录页，需要重新注册账户。如果还需要这些数据，请先取消并到「数据中心」导出 JSON 备份。
+          清除后会重新进入空账本，需要重新完成引导；云端账户不会被删除。如果还需要这些数据，请先取消并到「数据中心」导出 JSON 备份。
         </p>
       </Modal>
     </div>

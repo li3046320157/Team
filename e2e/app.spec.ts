@@ -48,6 +48,8 @@ async function loadApp(target: Page, username = 'e2e演示员', phone?: string) 
 }
 
 test.beforeAll(async ({ browser }) => {
+  const reset = await fetch('http://127.0.0.1:5174/functions/v1/app/__dev/reset', { method: 'POST' });
+  expect(reset.ok).toBe(true);
   context = await browser.newContext();
   page = await context.newPage();
   await loadApp(page);
@@ -55,6 +57,12 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(async () => {
   await context.close();
+});
+
+test('普通用户界面不出现管理员入口', async () => {
+  await expect(page.getByTestId('admin-root')).toHaveCount(0);
+  await expect(page.getByTestId('admin-gate')).toHaveCount(0);
+  await expect(page.getByTestId('admin-nav-users')).toHaveCount(0);
 });
 
 test('总览首屏说明系统目的与全部功能，并显示日/月/年现金流摘要', async () => {
@@ -281,9 +289,10 @@ test('个人资料与密码：改名后自动刷新，改密后退回登录页',
   await ownPage.getByTestId('auth-username').fill('e2e改名员');
   await ownPage.getByTestId('auth-password').fill('e2e-pass-456');
   await ownPage.getByTestId('auth-submit').click();
+  await expect(ownPage.getByTestId('user-chip')).toContainText('e2e改名员', { timeout: 60_000 });
+  await ownPage.goto('/#/');
   await expect(ownPage.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
   await awaitIntro(ownPage);
-  await expect(ownPage.getByTestId('user-chip')).toContainText('e2e改名员');
   await own.close();
 });
 
@@ -328,28 +337,67 @@ test('手机号登录与忘记密码：绑定手机号、回答问题重置密�
   await own.close();
 });
 
-test('清除本机数据后，新注册用户从空账本开始', async () => {
+test('清除本机账本后，云端账户保留并重新进入空账本', async () => {
   await page.goto('/#/settings');
   await expect(page.getByTestId('settings')).toBeVisible();
   await page.getByTestId('wipe-local-data').click();
-  const dialog = page.getByRole('dialog', { name: '清除本机全部数据？' });
+  const dialog = page.getByRole('dialog', { name: '清除本机账本数据？' });
   await dialog.getByTestId('confirm-wipe-local-data').click();
-  await expect(page.getByTestId('auth-page')).toBeVisible({ timeout: 30_000 });
-
-  await page.getByTestId('auth-go-register').click();
-  await page.getByTestId('auth-username').fill('e2e新用户');
-  await page.getByTestId('auth-password').fill('e2e-pass-456');
-  await page.getByTestId('auth-confirm').fill('e2e-pass-456');
-  await page.getByTestId('auth-recovery-question').selectOption({ index: 1 });
-  await page.getByTestId('auth-recovery-answer').fill('重置答案');
-  await page.getByTestId('auth-submit').click();
-  await expect(page.getByTestId('auth-registered-note')).toBeVisible();
-  await expect(page.getByTestId('auth-username')).toHaveValue('');
-  await page.getByTestId('auth-username').fill('e2e新用户');
-  await page.getByTestId('auth-password').fill('e2e-pass-456');
-  await page.getByTestId('auth-submit').click();
-  await expect(page.getByRole('button', { name: '开始记账' })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('auth-page')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '开始记账' })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('dashboard')).toHaveCount(0);
+});
+
+test('管理员：首登强制改密、用户管理与独立控制台', async ({ browser }) => {
+  const adminContext = await browser.newContext();
+  const adminPage = await adminContext.newPage();
+  await adminPage.goto('/');
+  await expect(adminPage.getByTestId('auth-page')).toBeVisible();
+  await skipAuthIntro(adminPage);
+  await adminPage.getByTestId('auth-username').fill('root');
+  await adminPage.getByTestId('auth-password').fill('123456');
+  await adminPage.getByTestId('auth-submit').click();
+
+  await expect(adminPage.getByTestId('admin-gate')).toBeVisible({ timeout: 30_000 });
+  await expect(adminPage.locator('.admin-root')).toBeVisible();
+  await expect(adminPage.getByTestId('dashboard')).toHaveCount(0);
+  await adminPage.getByTestId('admin-gate-username').fill('账本管理员');
+  await adminPage.getByTestId('admin-gate-current').fill('123456');
+  await adminPage.getByTestId('admin-gate-password').fill('E2eRoot2026');
+  await adminPage.getByTestId('admin-gate-confirm').fill('E2eRoot2026');
+  await adminPage.getByTestId('admin-gate-submit').click();
+  await expect(adminPage.getByTestId('admin-overview')).toBeVisible({ timeout: 30_000 });
+  await expect(adminPage.getByTestId('admin-gate')).toHaveCount(0);
+
+  await adminPage.getByRole('navigation', { name: '管理员导航', exact: true }).getByTestId('admin-nav-users').click();
+  await expect(adminPage.getByTestId('admin-users')).toBeVisible();
+  const row = adminPage.getByTestId('admin-user-row').filter({ hasText: 'e2e演示员' }).first();
+  await expect(row).toBeVisible();
+  await row.click();
+  const detail = adminPage.getByTestId('admin-user-detail');
+  await expect(detail).toBeVisible();
+  await expect(detail).toContainText('不包含账本流水');
+  await expect(detail).toContainText('完整手机号');
+  await adminPage.getByTestId('admin-toggle-status').click();
+  await detail.getByRole('button', { name: '确认停用' }).click();
+  await expect(detail).toContainText('已停用');
+  await adminPage.getByTestId('admin-toggle-status').click();
+  await expect(detail).toContainText('账户正常');
+  await adminPage.keyboard.press('Escape');
+  await expect(detail).toBeHidden();
+
+  await adminPage.getByRole('navigation', { name: '管理员导航', exact: true }).getByTestId('admin-nav-security').click();
+  await expect(adminPage.getByTestId('admin-security')).toBeVisible();
+  await adminPage.getByTestId('admin-logout').click();
+  await expect(adminPage.getByTestId('auth-page')).toBeVisible({ timeout: 20_000 });
+
+  await skipAuthIntro(adminPage);
+  await adminPage.getByTestId('auth-username').fill('账本管理员');
+  await adminPage.getByTestId('auth-password').fill('E2eRoot2026');
+  await adminPage.getByTestId('auth-submit').click();
+  await expect(adminPage.getByTestId('admin-overview')).toBeVisible({ timeout: 30_000 });
+  await expect(adminPage.getByTestId('admin-gate')).toHaveCount(0);
+  await adminContext.close();
 });
 
 test('移动端：账本翻页栏与目录抽屉可进入计划页', async ({ browser }) => {

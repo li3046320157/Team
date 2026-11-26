@@ -1,8 +1,8 @@
-/** 本机数据清理：删除全部账户、账本与本地配置，回到首次打开的状态。 */
+/** 本机数据清理：删除账本、偏好与旧版本地账户；云端账户不受影响。 */
 import { closeAllDbs } from './db';
-import { closeAuthDb } from './auth';
 
 const CLEAN_SLATE_KEY = 'moneyflow.cleanSlate.v1';
+const LEGACY_SESSION_KEY = 'moneyflow.session';
 const KNOWN_DBS = ['moneyflow-auth', 'moneyflow-personal', 'moneyflow-demo'];
 
 function deleteDatabase(name: string): Promise<void> {
@@ -20,7 +20,6 @@ function deleteDatabase(name: string): Promise<void> {
 
 export async function wipeAllLocalData(): Promise<void> {
   closeAllDbs();
-  closeAuthDb();
   const names = new Set(KNOWN_DBS);
   try {
     const factory = indexedDB as IDBFactory & { databases?: () => Promise<{ name?: string }[]> };
@@ -40,6 +39,22 @@ export async function wipeAllLocalData(): Promise<void> {
     /* 隐私模式下忽略存储清理失败 */
   }
   await Promise.all([...names].map(deleteDatabase));
+}
+
+let legacyRetired: Promise<void> | null = null;
+
+/** 退出旧版本地账户机制：只移除旧会话与旧账户库，保留本机账本。 */
+export function retireLegacyLocalAuth(): Promise<void> {
+  if (legacyRetired) return legacyRetired;
+  legacyRetired = (async () => {
+    try {
+      localStorage.removeItem(LEGACY_SESSION_KEY);
+    } catch {
+      /* 隐私模式下忽略 */
+    }
+    await deleteDatabase('moneyflow-auth');
+  })();
+  return legacyRetired;
 }
 
 let cleanSlate: Promise<void> | null = null;

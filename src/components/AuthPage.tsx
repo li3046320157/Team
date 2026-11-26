@@ -2,7 +2,16 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, Lock, ShieldCheck, Smartphone, User, UserPlus } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import { findAccountByIdentifier, RECOVERY_QUESTIONS, resetPasswordWithAnswer, type AccountLookup } from '../data/auth';
+import { apiLookupRecovery, apiResetPassword } from '../data/account-api';
+import { apiErrorMessage } from '../data/api-core';
+import {
+  RECOVERY_QUESTIONS,
+  normalizePhone,
+  validateCredentials,
+  validateNewPassword,
+  validateRecoveryAnswer,
+  type AccountLookup,
+} from '../data/auth';
 import { formatCN, todayISO } from '../domain/days';
 import { isReducedMotion } from '../motion/gsap';
 import { AuthIntro } from './AuthIntro';
@@ -303,9 +312,34 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     event.preventDefault();
     if (busy) return;
     setError(null);
-    if (mode === 'register' && password !== confirm) {
-      fail('两次输入的密码不一致');
-      return;
+    if (mode === 'login') {
+      if (!username.trim() || !password) {
+        fail('请输入用户名或手机号与密码');
+        return;
+      }
+    } else {
+      if (password !== confirm) {
+        fail('两次输入的密码不一致');
+        return;
+      }
+      const invalid = validateCredentials(username, password);
+      if (invalid) {
+        fail(invalid);
+        return;
+      }
+      if (phoneInput.trim() && !normalizePhone(phoneInput)) {
+        fail('手机号需为 11 位数字，且以 1 开头');
+        return;
+      }
+      if (!recoveryQuestion) {
+        fail('请选择找回问题');
+        return;
+      }
+      const answerError = validateRecoveryAnswer(recoveryAnswer);
+      if (answerError) {
+        fail(answerError);
+        return;
+      }
     }
     setBusy(true);
     if (mode === 'login') {
@@ -366,7 +400,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     }
     setForgotBusy(true);
     try {
-      const hint = await findAccountByIdentifier(value);
+      const hint = await apiLookupRecovery(value);
       if (!hint) {
         setLookup(null);
         setForgotError('没有找到匹配的账户，请检查用户名或手机号');
@@ -377,7 +411,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
       setForgotNewPwd('');
       setForgotConfirm('');
     } catch (err) {
-      setForgotError(err instanceof Error ? err.message : '查询失败，请重试');
+      setForgotError(apiErrorMessage(err, '查询失败，请重试'));
     } finally {
       setForgotBusy(false);
     }
@@ -387,8 +421,14 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     event.preventDefault();
     if (!lookup || forgotBusy) return;
     setForgotError(null);
-    if (forgotNewPwd.length < 6 || forgotNewPwd.length > 64) {
-      setForgotError('新密码长度需为 6–64 个字符');
+    const answerError = validateRecoveryAnswer(forgotAnswer);
+    if (answerError) {
+      setForgotError('请填写找回答案');
+      return;
+    }
+    const passwordError = validateNewPassword(forgotNewPwd);
+    if (passwordError) {
+      setForgotError(passwordError.replace('密码长度需为', '新密码长度需为'));
       return;
     }
     if (forgotNewPwd !== forgotConfirm) {
@@ -397,13 +437,13 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     }
     setForgotBusy(true);
     try {
-      const user = await resetPasswordWithAnswer(lookup.username, forgotAnswer, forgotNewPwd);
+      const username = await apiResetPassword(lookup.username, forgotAnswer, forgotNewPwd);
       closeForgot();
-      setUsername(user.username);
+      setUsername(username);
       setPassword('');
-      notify(`账户「${user.username}」密码已重置，请使用新密码登录`, 'success');
+      notify(`账户「${username}」密码已重置，请使用新密码登录`, 'success');
     } catch (err) {
-      setForgotError(err instanceof Error ? err.message : '重置失败，请重试');
+      setForgotError(apiErrorMessage(err, '重置失败，请重试'));
     } finally {
       setForgotBusy(false);
     }
@@ -422,14 +462,14 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             <div className="brand-mark auth-logo grid h-11 w-11 place-items-center rounded-2xl text-xl font-bold text-white">¥</div>
             <div>
               <p className="text-[17px] font-semibold tracking-tight">金钱流水</p>
-              <p className="mt-0.5 text-[10px] tracking-[0.2em] text-[#8A887F]">本地账本 · LOCAL LEDGER</p>
+              <p className="mt-0.5 text-[10px] tracking-[0.2em] text-[#8A887F]">私人账本 · PRIVATE LEDGER</p>
             </div>
           </div>
           <CoinStage />
           <div className="auth-hero-copy">
             <p className="auth-hero-kicker">顺手记一笔 · 日月年都看得清</p>
             <h1 className="auth-hero-title">把每一枚小钱，<br />都记进同一本账。</h1>
-            <p className="auth-hero-sub">金币雨会随鼠标方向飘落，点击小金币会闪亮消失；账本、账户与流水都只留在本机浏览器。</p>
+            <p className="auth-hero-sub">金币雨会随鼠标方向飘落，点击小金币会闪亮消失；登录账户由云端安全服务托管，账本与流水仍只保存在本机浏览器。</p>
             <div className="auth-hero-chips" aria-hidden="true">
               <span className="is-accent">日 · 月 · 年监测</span>
               <span className="is-gold">现金流预测</span>
@@ -442,8 +482,8 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           <div key={mode} className="auth-card ledger-paper">
             <span className="ledger-seal" aria-hidden="true">账</span>
             <header className="ledger-head">
-              <p className="ledger-kicker">金钱流水 · 本地账本</p>
-              <h2 className="ledger-title">{forgot ? '找回密码' : mode === 'login' ? '欢迎回来' : '创建本地账户'}</h2>
+              <p className="ledger-kicker">金钱流水 · 私人账本</p>
+              <h2 className="ledger-title">{forgot ? '找回密码' : mode === 'login' ? '欢迎回来' : '创建账户'}</h2>
               <p className="ledger-date">{formatCN(todayISO())} · {forgot ? '核对身份' : mode === 'login' ? '对账入账' : '开立新户'}</p>
             </header>
             <div className="ledger-rule" aria-hidden="true" />
@@ -571,12 +611,12 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                     </button>
                   )}
                   <p className="mt-1 text-[12px] leading-relaxed text-[#6B6A63]">
-                    {mode === 'login' ? '登录你的本地账本；支持用户名或已绑定的手机号。' : '账户与账本只保存在这台设备的浏览器里，注册后需登录进入。'}
+                    {mode === 'login' ? '登录你的私人账本；支持用户名或已绑定的手机号。' : '账户资料由云端账户服务托管，用于安全登录；账本流水仍只保存在这台浏览器。'}
                   </p>
                   {mode === 'register' && (
                     <ul className="ledger-note mt-2.5">
-                      <li><CheckCircle2 size={13} className="shrink-0 text-[var(--accent)]" /> 密码与找回答案加盐哈希，仅存本机浏览器</li>
-                      <li><CheckCircle2 size={13} className="shrink-0 text-[var(--accent)]" /> 每个用户独立账本，互不可见</li>
+                      <li><CheckCircle2 size={13} className="shrink-0 text-[var(--accent)]" /> 密码与找回答案加盐哈希，保存在云端账户服务</li>
+                      <li><CheckCircle2 size={13} className="shrink-0 text-[var(--accent)]" /> 每个用户独立账本，账本流水不上传服务器</li>
                       <li><CheckCircle2 size={13} className="shrink-0 text-[var(--accent)]" /> 设置找回问题后，忘记密码可自助重置</li>
                     </ul>
                   )}
@@ -680,7 +720,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                           data-testid="auth-recovery-answer"
                         />
                       </div>
-                      <p className="mt-2 text-[10px] leading-relaxed text-[#8A887F]">答案加盐哈希后仅存本机；手机号可留空，登录后也能在设置中补充。</p>
+                      <p className="mt-2 text-[10px] leading-relaxed text-[#8A887F]">答案加盐哈希后保存在账户服务；手机号可留空，登录后也能在设置中补充。</p>
                     </div>
                   )}
 
@@ -726,8 +766,8 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               <ShieldCheck size={13} className="mt-0.5 shrink-0 text-[var(--accent)]" />
               <span>
                 {forgot
-                  ? '找回答案只以加盐哈希保存在本机；重置只影响该账户密码，不会改动账本数据。'
-                  : '密码加盐哈希后只保存在本机；换电脑或清理浏览器数据前，请先在「数据中心」导出备份。'}
+                  ? '找回答案只以加盐哈希保存在账户服务；重置只影响该账户密码，不会改动本机账本。'
+                  : '登录状态由安全 Cookie 维护；账本流水不上传，换设备或清理浏览器前，请先在「数据中心」导出备份。'}
               </span>
             </div>
           </div>

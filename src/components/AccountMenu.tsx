@@ -45,7 +45,7 @@ export function AccountMenu({ variant = 'sidebar' }: { variant?: 'sidebar' | 'mo
         <span className="account-avatar" aria-hidden="true">{initial}</span>
         <span className="account-meta">
           <span className="account-name" data-testid={isSidebar ? 'user-chip' : undefined}>{user.username}</span>
-          {isSidebar && <span className="account-role">个人设置 · 本地账户</span>}
+          {isSidebar && <span className="account-role">个人设置 · 账本仅存本机</span>}
         </span>
         <ChevronDown size={14} className={cn('account-chevron', open && 'is-open')} aria-hidden="true" />
       </button>
@@ -56,7 +56,7 @@ export function AccountMenu({ variant = 'sidebar' }: { variant?: 'sidebar' | 'mo
             <span className="account-avatar is-large" aria-hidden="true">{initial}</span>
             <div className="min-w-0">
               <p className="truncate text-[13px] font-semibold text-[#2E332D]">{user.username}</p>
-              <p className="mt-0.5 text-[10.5px] text-[#8A887F]">本地账户 · 数据仅存本机</p>
+              <p className="mt-0.5 text-[10.5px] text-[#8A887F]">云端账户 · 账本仅存本机</p>
             </div>
           </div>
           <div className="account-pop-sep" />
@@ -73,12 +73,12 @@ export function AccountMenu({ variant = 'sidebar' }: { variant?: 'sidebar' | 'mo
             type="button"
             role="menuitem"
             className="account-pop-item is-danger"
-            onClick={() => { setOpen(false); logout(); navigate('/'); }}
+            onClick={() => { setOpen(false); void logout().then((message) => { if (!message) navigate('/'); }); }}
             data-testid={isSidebar ? 'logout' : 'logout-mobile'}
           >
             <LogOut size={15} /> 退出登录
           </button>
-          <p className="account-pop-note"><ShieldCheck size={12} /> 密码加盐哈希，仅保存在这台设备</p>
+          <p className="account-pop-note"><ShieldCheck size={12} /> 密码由云端加盐哈希保存，账本不上传</p>
         </div>
       )}
     </div>
