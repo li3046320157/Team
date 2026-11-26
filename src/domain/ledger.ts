@@ -10,6 +10,8 @@ import type {
   Transaction,
 } from './types';
 import { addDaysISO, diffDays, isValidISODate, monthKey } from './days';
+import { periodOf } from './period';
+import { periodTotals } from './periodStats';
 
 export function accountBalanceAt(account: Account, transactions: Transaction[], asOf: ISODate): Cents {
   let balance = account.openingBalance;
@@ -31,19 +33,13 @@ export function totalBalanceAt(accounts: Account[], transactions: Transaction[],
     .reduce((sum, a) => sum + accountBalanceAt(a, transactions, asOf), 0);
 }
 
+/** 兼容旧签名：月统计 = 月周期聚合。新代码请直接用 periodStats。 */
 export function monthIncomeExpense(
   transactions: Transaction[],
   month: string,
 ): { income: Cents; expense: Cents; net: Cents } {
-  let income = 0;
-  let expense = 0;
-  for (const t of transactions) {
-    if (t.kind === 'transfer') continue;
-    if (monthKey(t.date) !== month) continue;
-    if (t.kind === 'income') income += t.amount;
-    else expense += t.amount;
-  }
-  return { income, expense, net: income - expense };
+  const { income, expense, net } = periodTotals(transactions, periodOf('month', `${month}-01`));
+  return { income, expense, net };
 }
 
 /** 统计任意闭区间 [start, end] 的收入、支出与结余，转账不计入。 */

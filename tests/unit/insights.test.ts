@@ -285,4 +285,35 @@ describe('高频小额消费', () => {
     });
     expect(result.count).toBe(0);
   });
+
+  it('7 天窗口只统计该周内的小额消费', () => {
+    const txns = [
+      makeTxn({ id: 'a', date: '2026-06-26', amount: 1200, merchant: '便利店' }),
+      makeTxn({ id: 'b', date: '2026-06-28', amount: 1200, merchant: '便利店' }),
+      makeTxn({ id: 'old', date: '2026-06-20', amount: 1200, merchant: '便利店' }),
+    ];
+    const result = detectSmallSpending({
+      transactions: txns,
+      asOfDate: '2026-06-30',
+      threshold: 3000,
+      windowDays: 7,
+      categories: [makeCategory()],
+    });
+    expect(result.count).toBe(2);
+    expect(result.byMerchant[0]).toMatchObject({ label: '便利店', count: 2, total: 2400 });
+  });
+
+  it('年窗口下每周次数按 365 天折算', () => {
+    const txns = Array.from({ length: 20 }, (_, i) =>
+      makeTxn({ id: `s${i}`, date: `2026-01-${String((i % 28) + 1).padStart(2, '0')}`, amount: 1200, merchant: '便利店' }),
+    );
+    const result = detectSmallSpending({
+      transactions: txns,
+      asOfDate: '2026-06-30',
+      threshold: 3000,
+      windowDays: 365,
+      categories: [makeCategory()],
+    });
+    expect(result.byMerchant[0].perWeek).toBe(0.4);
+  });
 });

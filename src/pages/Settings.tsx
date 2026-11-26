@@ -62,7 +62,6 @@ export function SettingsPage() {
   const [allocDay, setAllocDay] = useState(String(s.goalAllocDay));
   const [quickInput, setQuickInput] = useState(s.quickInputEnabled);
   const [smallThreshold, setSmallThreshold] = useState((s.smallThreshold / 100).toFixed(2));
-  const [smallWindow, setSmallWindow] = useState(String(s.smallWindowDays));
   const [anomalyWindow, setAnomalyWindow] = useState(String(s.anomalyWindowDays));
   const [anomalySamples, setAnomalySamples] = useState(String(s.anomalyMinSamples));
   const [anomalyZ, setAnomalyZ] = useState(String(s.anomalyRobustZ));
@@ -126,8 +125,6 @@ export function SettingsPage() {
     if (!smallParsed.ok) return setError(`小额阈值：${smallParsed.error}`);
     const day = Number(allocDay);
     if (!Number.isInteger(day) || day < 1 || day > 31) return setError('目标分配日需为 1-31');
-    const sw = Number(smallWindow);
-    if (!Number.isInteger(sw) || sw < 1 || sw > 365) return setError('小额统计窗口需为 1-365 天');
     const aw = Number(anomalyWindow);
     if (!Number.isInteger(aw) || aw < 7 || aw > 730) return setError('异常检测窗口需为 7-730 天');
     const as = Number(anomalySamples);
@@ -150,7 +147,7 @@ export function SettingsPage() {
           safetyReserve: safetyParsed.cents,
           budget: { monthVariableBudget: budgetParsed.cents, monthlySavingsCap: capParsed.cents },
           smallThreshold: smallParsed.cents,
-          smallWindowDays: sw,
+          smallWindowDays: d.settings.smallWindowDays,
           anomalyWindowDays: aw,
           anomalyMinSamples: as,
           anomalyRobustZ: az,
@@ -605,12 +602,9 @@ export function SettingsPage() {
         </Card>
 
         <Card className="rise" style={{ '--i': 4 } as CSSProperties} title="小额消费聚合" subtitle="把高频小钱汇总起来看，避免「每笔都不贵」的错觉" action={<Info size={15} className="text-[#B7791F]" />}>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="小额阈值（元）"><input className="input num" inputMode="decimal" value={smallThreshold} onChange={(e) => setSmallThreshold(e.target.value)} /></Field>
-            <Field label="统计窗口（天）"><input className="input num" type="number" min={1} max={365} value={smallWindow} onChange={(e) => setSmallWindow(e.target.value)} /></Field>
-          </div>
+          <Field label="小额阈值（元）"><input className="input num" inputMode="decimal" value={smallThreshold} onChange={(e) => setSmallThreshold(e.target.value)} /></Field>
           <p className="mt-2 text-[10.5px] leading-relaxed text-[#8A887F]">
-            低于等于阈值的可变支出会被聚合，展示笔数、金额与占可变消费比例；不会修改或合并真实交易。
+            统计窗口由洞察页的周期选择决定；这里只设置「小额」的金额阈值。
           </p>
         </Card>
 

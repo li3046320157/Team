@@ -1,23 +1,32 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { BadgeCheck, CalendarClock, CircleHelp, Coffee, EyeOff, Info, Repeat2, ShieldAlert, Sparkles, TrendingUp } from 'lucide-react';
 import type { RecurringCandidate } from '../domain/types';
 import { useAppStore } from '../store/useAppStore';
-import { todayISO } from '../domain/days';
+import { diffDays, formatCN, minISO, todayISO } from '../domain/days';
+import { normalizeMerchantKey } from '../domain/ids';
+import { isInPeriod, periodLabel } from '../domain/period';
+import { periodTotals } from '../domain/periodStats';
+import { usePeriodParams } from '../lib/usePeriodParams';
+import { PeriodPicker } from '../components/PeriodPicker';
 import { detectRecurringCandidates } from '../domain/insights/recurring';
 import { detectAnomalies } from '../domain/insights/anomaly';
 import { detectSmallSpending } from '../domain/insights/small';
 import { confirmCandidate, setCandidateStatus, setReview } from '../services/mutations';
 import { Badge, Button, Card, EmptyState, Field, Modal, Money, PageHeader, cn } from '../components/ui';
-import { formatCN } from '../domain/days';
 import { frequencyLabel, pct } from '../lib/ui';
 
 export function InsightsPage() {
   const dataset = useAppStore((s) => s.dataset)!;
   const apply = useAppStore((s) => s.apply);
   const today = todayISO();
+  const { unit, anchor, period, setPeriod } = usePeriodParams('month');
   const [confirming, setConfirming] = useState<RecurringCandidate | null>(null);
   const [leavingIds, setLeavingIds] = useState<ReadonlySet<string>>(new Set());
+  const [anomalyScope, setAnomalyScope] = useState<'period' | 'all'>('period');
+  useEffect(() => {
+    setAnomalyScope('period');
+  }, [period.key]);
 
   const markLeaving = (id: string) => setLeavingIds((prev) => new Set(prev).add(id));
   const unmarkLeaving = (id: string) =>
@@ -44,20 +53,44 @@ export function InsightsPage() {
     [dataset, today],
   );
   const small = useMemo(
-    () => detectSmallSpending({
-      transactions: dataset.transactions,
-      asOfDate: today,
-      threshold: dataset.settings.smallThreshold,
-      windowDays: dataset.settings.smallWindowDays,
-      categories: dataset.categories,
-    }),
-    [dataset, today],
+    () => {
+      const effectiveEnd = minISO(period.end, today);
+      const windowDays = diffDays(period.start, effectiveEnd) + 1;
+      return detectSmallSpending({
+        transactions: dataset.transactions,
+        asOfDate: effectiveEnd,
+        threshold: dataset.settings.smallThreshold,
+        windowDays,
+        categories: dataset.categories,
+      });
+    },
+    [dataset, today, period.key],
+  );
+
+  const totals = useMemo(
+    () => periodTotals(dataset.transactions, period),
+    [dataset.transactions, period.key],
+  );
+  const candidateHits = useMemo(
+    () => {
+      const map = new Map<string, number>();
+      for (const t of dataset.transactions) {
+        if (t.kind !== 'expense' || !isInPeriod(t.date, period)) continue;
+        const key = normalizeMerchantKey(t.merchant);
+        if (!key) continue;
+        map.set(key, (map.get(key) ?? 0) + 1);
+      }
+      return map;
+    },
+    [dataset.transactions, period.key],
   );
 
   const openCandidates = candidates.filter((c) => c.status === 'open');
   const reviewed = candidates.filter((c) => c.status !== 'open');
   const openAnomalies = anomalies.insights.filter((i) => !i.review || i.review.status === 'open');
   const handledAnomalies = anomalies.insights.filter((i) => i.review && i.review.status !== 'open');
+  const openInPeriod = openAnomalies.filter((a) => isInPeriod(a.date, period));
+  const shownAnomalies = anomalyScope === 'all' ? openAnomalies : openInPeriod;
 
   return (
     <div className="fade-in" data-testid="insights">
@@ -67,12 +100,22 @@ export function InsightsPage() {
         actions={<Badge tone="teal"><Sparkles size={11} /> 本地计算</Badge>}
       />
 
+      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-[#EFECE6] bg-[#FCFBF8] px-3 py-2.5">
+        <PeriodPicker unit={unit} anchor={anchor} today={today} onChange={setPeriod} testIdPrefix="insights-period" />
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] text-[#6B6A63]" data-testid="insights-overview">
+          <span>本期：支出 <Money cents={totals.expense} className="font-semibold text-[#98362E]" /></span>
+          <span>· 收入 <Money cents={totals.income} className="font-semibold text-[#0B6357]" /></span>
+          <span>· {totals.count} 笔</span>
+          <span>· 最大单笔 <Money cents={totals.maxExpense} className="font-semibold" /></span>
+        </p>
+      </div>
+
       <div className="grid gap-4 xl:grid-cols-2">
         <Card
           className="rise"
           style={{ '--i': 0 } as CSSProperties}
           title="周期支出候选"
-          subtitle="同商户、金额稳定、间隔接近周/月/年；确认后才创建计划"
+          subtitle="同商户、金额稳定、间隔接近周/月/年；确认后才创建计划。候选来自全部历史，不受周期影响。"
           action={
             <span key={openCandidates.length} className="balance-pulse inline-flex">
               <Badge tone={openCandidates.length ? 'amber' : 'teal'}>{openCandidates.length} 个待确认</Badge>
@@ -108,7 +151,7 @@ export function InsightsPage() {
                     <span>样本 {pct(c.scoreParts.sample)}</span>
                   </div>
                   <p className="mt-1.5 text-[10.5px] leading-relaxed text-[#A3A097]">
-                    最近一次 {formatCN(c.lastDate)} · 金额波动 {pct(c.amountCv, 1)} · 样本 {c.sampleIds.length} 笔
+                    最近一次 {formatCN(c.lastDate)} · 金额波动 {pct(c.amountCv, 1)} · 样本 {c.sampleIds.length} 笔 · 本周期已发生 {candidateHits.get(c.merchantKey) ?? 0} 次
                   </p>
                   <div className="mt-2 flex items-center justify-end gap-2">
                     <Button size="xs" variant="ghost" onClick={() => collapseApply(c.id, () => apply((d) => setCandidateStatus(d, c, 'ignored'), '已忽略该候选'))}>
@@ -128,21 +171,40 @@ export function InsightsPage() {
           className="rise"
           style={{ '--i': 1 } as CSSProperties}
           title="异常消费"
-          subtitle="MAD 稳健 Z 为主，MAD=0 时退回 IQR 或倍数规则；只用该笔之前的历史"
+          subtitle={`MAD 稳健 Z 为主，MAD=0 时退回 IQR 或倍数规则；只用该笔之前的历史。检测用最近 ${dataset.settings.anomalyWindowDays} 天历史池，展示按所选周期。`}
           action={
-            <span key={openAnomalies.length} className="balance-pulse inline-flex">
-              <Badge tone={openAnomalies.length ? 'amber' : 'teal'}>{openAnomalies.length} 条待复核</Badge>
+            <span key={`${anomalyScope}:${shownAnomalies.length}`} className="balance-pulse inline-flex items-center gap-2">
+              <Badge tone={shownAnomalies.length ? 'amber' : 'teal'}>{anomalyScope === 'all' ? `全部 ${shownAnomalies.length} 条` : `本期 ${openInPeriod.length} 条`}</Badge>
+              {anomalyScope === 'period' && openAnomalies.length > openInPeriod.length && (
+                <button type="button" data-testid="anomaly-show-all" className="text-[11px] font-semibold text-[#0B6357] hover:underline" onClick={() => setAnomalyScope('all')}>
+                  查看全部 {openAnomalies.length} 条
+                </button>
+              )}
+              {anomalyScope === 'all' && (
+                <button type="button" className="text-[11px] font-semibold text-[#0B6357] hover:underline" onClick={() => setAnomalyScope('period')}>
+                  回到本期
+                </button>
+              )}
             </span>
           }
         >
-          {openAnomalies.length === 0 ? (
+          {shownAnomalies.length === 0 ? (
             <EmptyState
-              title="最近 60 天没有待复核异常"
-              description={anomalies.insufficient > 0 ? `有 ${anomalies.insufficient} 笔因同类历史不足而跳过，不硬判异常。` : '支出金额与历史分布接近，或异常已全部复核。'}
+              title={anomalyScope === 'all' ? '最近 60 天没有待复核异常' : '本期没有待复核异常'}
+              description={
+                openAnomalies.length > 0
+                  ? `本期 0 条，全部还有 ${openAnomalies.length} 条待复核。`
+                  : anomalies.insufficient > 0
+                    ? `有 ${anomalies.insufficient} 笔因同类历史不足而跳过，不硬判异常。`
+                    : '支出金额与历史分布接近，或异常已全部复核。'
+              }
+              action={anomalyScope === 'period' && openAnomalies.length > 0 ? (
+                <Button size="xs" variant="secondary" onClick={() => setAnomalyScope('all')}>查看全部 {openAnomalies.length} 条</Button>
+              ) : undefined}
             />
           ) : (
             <ul className="space-y-3">
-              {openAnomalies.slice(0, 5).map((a, i) => (
+              {shownAnomalies.slice(0, 5).map((a, i) => (
                 <li
                   key={a.txId}
                   className={cn('rounded-xl border border-[#EEDCB9] bg-[#FDFAF3] p-3', leavingIds.has(a.txId) ? 'row-collapse' : 'rise')}
@@ -178,10 +240,10 @@ export function InsightsPage() {
           className="rise"
           style={{ '--i': 2 } as CSSProperties}
           title="高频小额"
-          subtitle={`最近 ${small.windowDays} 天，单笔不超过 ¥${(small.threshold / 100).toFixed(0)} 的消费聚合`}
+          subtitle={`${periodLabel(period)} · 单笔 ≤ ¥${(small.threshold / 100).toFixed(0)} 的消费聚合`}
           action={
             <span key={small.count} className="balance-pulse inline-flex">
-              <Badge tone={small.reminder ? 'amber' : 'teal'}>{small.count} 笔</Badge>
+              <Badge tone={small.reminder ? 'amber' : 'teal'}>本期 {small.count} 笔</Badge>
             </span>
           }
         >
@@ -198,13 +260,17 @@ export function InsightsPage() {
                 {small.byMerchant.slice(0, 5).map((g) => (
                   <li key={g.key} className="flex items-center justify-between gap-2 text-[12px]">
                     <span className="flex min-w-0 items-center gap-2"><Coffee size={13} className="shrink-0 text-[#8A887F]" /><span className="truncate">{g.label}</span></span>
-                    <span className="num shrink-0 text-[#6B6A63]">{g.count} 笔 · 每周 {g.perWeek} 次 · <Money cents={g.total} /></span>
+                    <span className="num shrink-0 text-[#6B6A63]">
+                      {small.windowDays === 1 ? `当日 ${g.count} 笔` : small.windowDays >= 7 ? `${g.count} 笔 · 每周 ${g.perWeek} 次` : `${g.count} 笔`} · <Money cents={g.total} />
+                    </span>
                   </li>
                 ))}
               </ul>
               {small.reminder && (
                 <div className="mt-3 rounded-lg bg-[#FBF4E4] px-3 py-2 text-[11px] leading-relaxed text-[#7A5517]">
-                  小额消费已出现 {small.count} 笔，合计 <Money cents={small.total} />。金额不大但频率高，建议在预测中按真实频率估计。
+                  {period.end < today
+                    ? <>小额消费已出现 {small.count} 笔，合计 <Money cents={small.total} />。历史周期仅用于回看，不影响预测。</>
+                    : <>小额消费已出现 {small.count} 笔，合计 <Money cents={small.total} />。金额不大但频率高，建议在预测中按真实频率估计。</>}
                 </div>
               )}
             </>

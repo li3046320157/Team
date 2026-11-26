@@ -82,7 +82,7 @@ test('总览首屏说明系统目的与全部功能，并显示日/月/年现金
   await expect(page.getByTestId('section-mascot')).toBeVisible();
   await expect(page.getByRole('heading', { name: /花钱之前/ })).toBeVisible();
   await expect(page.getByText('全部功能 · 每个模块解决什么问题')).toBeVisible();
-  await expect(page.getByRole('heading', { name: '现金流监测 · 日 / 月 / 年' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '现金流监测 · 日 / 周 / 月 / 年' })).toBeVisible();
   await expect(page.getByText('本月结余', { exact: true })).toBeVisible();
   await expect(page.getByTestId('quick-add')).toBeVisible();
 });
@@ -554,6 +554,74 @@ test('数据不足：新开户未登记覆盖区间时预测与沙盘显示数�
   await expect(ownPage.getByTestId('sandbox')).toBeVisible();
   await expect(ownPage.getByText('历史数据不足，四种路径只反映支出结构差异，不能当作安全结论')).toBeVisible();
   await own.close();
+});
+
+test('流水页切换「周」：URL 记录并在刷新后保持，上一周期可用', async () => {
+  await page.goto('/#/ledger');
+  await expect(page.getByTestId('ledger')).toBeVisible();
+  const picker = page.getByRole('group', { name: '统计周期' });
+  await picker.getByRole('button', { name: '周', exact: true }).click();
+  await expect(page).toHaveURL(/unit=week/);
+  expect(page.url().match(/anchor=([^&]*)/)?.[1]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  await expect(page.getByTestId('ledger-period-label')).toContainText('–');
+  await page.reload();
+  await expect(page.getByTestId('ledger')).toBeVisible();
+  await expect(page).toHaveURL(/unit=week/);
+  await page.getByTestId('ledger-period-prev').click();
+  await expect(page.getByTestId('ledger-period-today')).toBeVisible();
+});
+
+test('回到今天：回到当前周期后按钮消失、下一周期禁用', async () => {
+  await page.goto('/#/ledger?unit=week&anchor=2020-01-01');
+  await expect(page.getByTestId('ledger')).toBeVisible();
+  const todayBtn = page.getByTestId('ledger-period-today');
+  await expect(todayBtn).toBeVisible();
+  await todayBtn.click();
+  await expect(page.getByTestId('ledger-period-today')).toHaveCount(0);
+  await expect(page.getByTestId('ledger-period-next')).toBeDisabled();
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const expectedAnchor = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  expect(page.url().match(/anchor=([^&]*)/)?.[1]).toBe(expectedAnchor);
+});
+
+test('洞察页周期切换：年视图小额卡与异常徽标、日视图候选卡说明', async () => {
+  await page.goto('/#/insights');
+  await expect(page.getByTestId('insights')).toBeVisible();
+  await expect(page.getByTestId('insights-overview')).toContainText('本期：支出');
+  const picker = page.getByRole('group', { name: '统计周期' });
+  await picker.getByRole('button', { name: '年', exact: true }).click();
+  const year = new Date().getFullYear();
+  await expect(page.getByText(`${year}年 · 单笔 ≤`, { exact: false })).toBeVisible();
+  await expect(page.getByText('本期 0 条', { exact: true })).toBeVisible();
+
+  await picker.getByRole('button', { name: '日', exact: true }).click();
+  const now = new Date();
+  const dayLabel = `${now.getMonth() + 1}月${now.getDate()}日`;
+  const smallCard = page.locator('.card').filter({ hasText: '高频小额' });
+  await expect(smallCard).toContainText(dayLabel);
+  await expect(smallCard).toContainText('· 单笔 ≤');
+  await expect(page.getByText('来自全部历史，不受周期影响', { exact: false })).toBeVisible();
+});
+
+test('移动端 375×812：统计周期切换器可见，日期输入隐藏', async ({ browser }) => {
+  const mobile = await browser.newContext({
+    viewport: { width: 375, height: 812 },
+    isMobile: true,
+    hasTouch: true,
+    locale: 'zh-CN',
+  });
+  const mp = await mobile.newPage();
+  await loadApp(mp, 'e2e移动周期');
+  await mp.goto('/#/ledger');
+  await expect(mp.getByTestId('ledger')).toBeVisible();
+  const picker = mp.getByRole('group', { name: '统计周期' });
+  await expect(picker).toBeVisible();
+  for (const label of ['日', '周', '月', '年']) {
+    await expect(picker.getByRole('button', { name: label, exact: true })).toBeVisible();
+  }
+  await expect(mp.getByTestId('ledger-period-date')).toBeHidden();
+  await mobile.close();
 });
 
 test('示例数据：新用户先进示例，退出后回到引导页', async ({ browser }) => {

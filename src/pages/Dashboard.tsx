@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useMemo, useRef, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -23,31 +23,36 @@ import {
 import type { EChartsOption } from 'echarts';
 import type { Transaction } from '../domain/types';
 import { useAppStore } from '../store/useAppStore';
-import { addDaysISO, diffDays, enumerateDays, formatCN, startOfMonthISO, todayISO } from '../domain/days';
-import { freeDisposable, goalViews, rangeIncomeExpense, totalBalanceAt, totalReservedAt } from '../domain/ledger';
+import { addDaysISO, diffDays, enumerateDays, formatCN, todayISO } from '../domain/days';
+import { freeDisposable, goalViews, totalBalanceAt, totalReservedAt } from '../domain/ledger';
+import type { Period } from '../domain/period';
+import { periodLabel, previousPeriod } from '../domain/period';
+import { compareTotals, periodTotals } from '../domain/periodStats';
+import { usePeriodParams } from '../lib/usePeriodParams';
 import { buildOccurrenceViews } from '../domain/occurrences';
 import { formatMoneyShort } from '../domain/money';
 import { EChart } from '../components/Chart';
-import { Badge, Button, Card, EmptyState, Money, Progress, Segmented, StatCard, cn } from '../components/ui';
+import { PeriodPicker } from '../components/PeriodPicker';
+import { Badge, Button, Card, EmptyState, Money, Progress, StatCard, cn } from '../components/ui';
 import { CountUpMoney, Marquee, ScrambleText, ScrollStory } from '../components/TextFx';
 import { gsap, isReducedMotion, useGSAP } from '../motion/gsap';
-import { dueLabel, monthLabel } from '../lib/ui';
+import { dueLabel } from '../lib/ui';
 import { cssColor } from '../theme/palette';
 
-type DashPeriod = 'day' | 'month' | 'year';
+type DashUnit = 'day' | 'week' | 'month' | 'year';
 
-const PERIOD_OPTIONS: { value: DashPeriod; label: string }[] = [
-  { value: 'day', label: '日' },
-  { value: 'month', label: '月' },
-  { value: 'year', label: '年' },
-];
-
-const PERIOD_META: Record<DashPeriod, { label: string; caption: string; trendTitle: string; trendNote: string }> = {
+const UNIT_META: Record<DashUnit, { label: string; caption: string; trendTitle: string; trendNote: string }> = {
   day: {
     label: '今日',
     caption: '今天',
     trendTitle: '近 14 天收支趋势',
     trendNote: '按日汇总实际发生的收入与支出，转账不计入收支。',
+  },
+  week: {
+    label: '本周',
+    caption: '本周',
+    trendTitle: '本周按日收支趋势',
+    trendNote: '按日汇总本周实际发生的收入与支出，转账不计入收支。',
   },
   month: {
     label: '本月',
@@ -69,14 +74,8 @@ interface TrendBucket {
   expense: number;
 }
 
-function periodStartFor(period: DashPeriod, today: string): string {
-  if (period === 'day') return today;
-  if (period === 'month') return startOfMonthISO(today);
-  return `${today.slice(0, 4)}-01-01`;
-}
-
-function buildTrend(transactions: Transaction[], period: DashPeriod, today: string): TrendBucket[] {
-  if (period === 'day') {
+function buildTrend(transactions: Transaction[], unit: DashUnit, period: Period, today: string): TrendBucket[] {
+  if (unit === 'day') {
     const days = enumerateDays(addDaysISO(today, -13), today);
     const map = new Map(days.map((day) => [day, { income: 0, expense: 0 }]));
     for (const t of transactions) {
@@ -92,7 +91,24 @@ function buildTrend(transactions: Transaction[], period: DashPeriod, today: stri
     }));
   }
 
-  if (period === 'month') {
+  if (unit === 'week') {
+    const end = period.end < today ? period.end : today;
+    const days = enumerateDays(period.start, end);
+    const map = new Map(days.map((day) => [day, { income: 0, expense: 0 }]));
+    for (const t of transactions) {
+      if (t.kind === 'transfer') continue;
+      const slot = map.get(t.date);
+      if (!slot) continue;
+      if (t.kind === 'income') slot.income += t.amount;
+      else slot.expense += t.amount;
+    }
+    return days.map((day) => ({
+      label: `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))}`,
+      ...map.get(day)!,
+    }));
+  }
+
+  if (unit === 'month') {
     const year = today.slice(0, 4);
     const currentMonth = Number(today.slice(5, 7));
     const keys = Array.from({ length: currentMonth }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`);
@@ -127,7 +143,7 @@ function buildTrend(transactions: Transaction[], period: DashPeriod, today: stri
 }
 
 const FEATURES = [
-  { to: '/', icon: LayoutDashboard, title: '总览', desc: '日、月、年的收入、支出与结余一眼看清，今日待办与目标进度同步呈现。', hue: 'var(--tone-blue)' },
+  { to: '/', icon: LayoutDashboard, title: '总览', desc: '日、周、月、年的收入、支出与结余一眼看清，今日待办与目标进度同步呈现。', hue: 'var(--tone-blue)' },
   { to: '/ledger', icon: List, title: '流水', desc: '表单或一句话速记，收入、支出、转账都记在同一本账。', hue: 'var(--tone-teal)' },
   { to: '/schedules', icon: Calendar, title: '计划', desc: '房租、订阅等固定收支建成计划，到期一键核销为真实流水。', hue: 'var(--tone-amber)' },
   { to: '/insights', icon: Sparkles, title: '洞察', desc: '聚合高频小额、标出异常消费，并从历史中识别周期收支。', hue: 'var(--tone-violet)' },
@@ -145,8 +161,7 @@ export function DashboardPage() {
   const exitDemo = useAppStore((s) => s.exitDemo);
   const navigate = useNavigate();
   const today = todayISO();
-  const month = today.slice(0, 7);
-  const [period, setPeriod] = useState<DashPeriod>('month');
+  const { unit, anchor, period, setPeriod } = usePeriodParams('month');
 
   const summary = useMemo(() => {
     const balance = totalBalanceAt(dataset.accounts, dataset.transactions, today);
@@ -163,12 +178,15 @@ export function DashboardPage() {
     const overdue = tasks.filter((t) => t.overdue);
     const upcoming = views.filter((v) => v.status === 'pending' && v.dueDate > today).slice(0, 5);
     const goals = goalViews(dataset.goals, dataset.goalEvents, today).filter((g) => g.goal.status === 'active');
-    return { balance, reserved, free, tasks, overdue, upcoming, goals };
-  }, [dataset, today]);
+    const stats = periodTotals(dataset.transactions, period);
+    const prevStats = periodTotals(dataset.transactions, previousPeriod(period));
+    const delta = compareTotals(stats, prevStats);
+    return { balance, reserved, free, tasks, overdue, upcoming, goals, stats, prevStats, delta };
+  }, [dataset, today, period.key]);
 
   const periodData = useMemo(() => {
-    const start = periodStartFor(period, today);
-    const stats = rangeIncomeExpense(dataset.transactions, start, today);
+    const start = period.start;
+    const stats = periodTotals(dataset.transactions, period);
     let count = 0;
     let incomeCount = 0;
     let expenseCount = 0;
@@ -187,11 +205,11 @@ export function DashboardPage() {
       expenseCount,
       days,
       avgExpense: Math.round(stats.expense / days),
-      trend: buildTrend(dataset.transactions, period, today),
+      trend: buildTrend(dataset.transactions, unit, period, today),
     };
-  }, [dataset.transactions, period, today]);
+  }, [dataset.transactions, unit, period.key, today]);
 
-  const meta = PERIOD_META[period];
+  const meta = UNIT_META[unit];
 
   const option = useMemo<EChartsOption>(() => {
     const labels = periodData.trend.map((bucket) => bucket.label);
@@ -214,7 +232,7 @@ export function DashboardPage() {
         formatter: (params: unknown) => {
           const arr = params as { seriesName?: string; axisValue?: string; value?: number }[];
           if (!arr.length) return '';
-          const head = period === 'year' ? `${arr[0].axisValue} 年` : arr[0].axisValue ?? '';
+          const head = unit === 'year' ? `${arr[0].axisValue} 年` : arr[0].axisValue ?? '';
           const rows = arr.map((p) => {
             const cents = typeof p.value === 'number' ? p.value : 0;
             return `${p.seriesName} ¥${(cents / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`;
@@ -239,19 +257,19 @@ export function DashboardPage() {
           name: '收入',
           type: 'bar',
           data: periodData.trend.map((bucket) => bucket.income),
-          barMaxWidth: period === 'day' ? 16 : 28,
+          barMaxWidth: unit === 'day' || unit === 'week' ? 16 : 28,
           itemStyle: { color: cssColor('--accent', '#0e7568'), borderRadius: [4, 4, 0, 0] },
         },
         {
           name: '支出',
           type: 'bar',
           data: periodData.trend.map((bucket) => bucket.expense),
-          barMaxWidth: period === 'day' ? 16 : 28,
+          barMaxWidth: unit === 'day' || unit === 'week' ? 16 : 28,
           itemStyle: { color: cssColor('--accent-2', '#b7791f'), borderRadius: [4, 4, 0, 0] },
         },
       ],
     };
-  }, [period, periodData.trend]);
+  }, [unit, periodData.trend]);
 
   const noAccounts = dataset.accounts.length === 0;
   const heroRef = useRef<HTMLElement>(null);
@@ -263,7 +281,7 @@ export function DashboardPage() {
     `${meta.label}结余 ${formatMoneyShort(periodData.net)}`,
     `目标预留 ${formatMoneyShort(summary.reserved)}`,
     '账本流水只保存在本机浏览器',
-    '整数分记账 · 日 / 月 / 年监测',
+    '整数分记账 · 日 / 周 / 月 / 年监测',
   ];
 
   useGSAP(() => {
@@ -302,7 +320,7 @@ export function DashboardPage() {
               <ScrambleText text="花钱之前，先看清今天、这个月和这一年的现金流。" duration={1.05} />
             </h1>
             <p className="mt-3 max-w-2xl text-[13px] leading-relaxed text-[#5F5E57]" data-hero-item>
-              金钱流水把真实流水、固定计划与目标预留放进同一本本地账本。总览按日、月、年汇总收入与支出，
+              金钱流水把真实流水、固定计划与目标预留放进同一本本地账本。总览按日、周、月、年汇总收入与支出，
               你可以随时切换粒度，回看钱从哪来、又去了哪，而不是月底才对着账单发呆。
             </p>
             <p className="mt-2 max-w-2xl text-[12px] leading-relaxed text-[#8A887F]" data-hero-item>
@@ -315,7 +333,7 @@ export function DashboardPage() {
               <Button variant="secondary" onClick={() => navigate('/sandbox')}>
                 <Sparkles size={15} /> 消费沙盘
               </Button>
-              <span className="chip chip-teal">日 / 月 / 年</span>
+              <span className="chip chip-teal">日 / 周 / 月 / 年</span>
               <span className="chip">整数分记账</span>
               <span className="chip">本地优先</span>
             </div>
@@ -325,7 +343,7 @@ export function DashboardPage() {
             <ol className="mt-2.5 space-y-2 text-[11.5px] leading-relaxed text-[#6B6A63]">
               <li><span className="num mr-1.5 font-semibold text-[var(--accent-ink)]">1</span>建立账户，填写期初余额与安全储备线</li>
               <li><span className="num mr-1.5 font-semibold text-[var(--accent-ink)]">2</span>记录流水，把房租等固定收支建成计划</li>
-              <li><span className="num mr-1.5 font-semibold text-[var(--accent-ink)]">3</span>按日、月、年回看收支，再用预测与沙盘评估大额消费</li>
+              <li><span className="num mr-1.5 font-semibold text-[var(--accent-ink)]">3</span>按日、周、月、年回看收支，再用预测与沙盘评估大额消费</li>
               <li><span className="num mr-1.5 font-semibold text-[var(--accent-ink)]">4</span>为目标预留资金，按节奏沉淀储蓄</li>
             </ol>
             <p className="mt-3 rounded-lg bg-white/70 px-2.5 py-2 text-[10.5px] leading-relaxed text-[#8A887F]">
@@ -381,11 +399,11 @@ export function DashboardPage() {
 
       <div className="mb-3 mt-6 flex flex-wrap items-end justify-between gap-3" data-reveal="">
         <div>
-          <h2 className="text-[20px] font-semibold tracking-[-0.01em]">现金流监测 · 日 / 月 / 年</h2>
-          <p className="mt-1 text-[12px] text-[#8A887F]">{formatCN(today)} · {monthLabel(month)} · 切换粒度查看真实收支</p>
+          <h2 className="text-[20px] font-semibold tracking-[-0.01em]">现金流监测 · 日 / 周 / 月 / 年</h2>
+          <p className="mt-1 text-[12px] text-[#8A887F]">{formatCN(today)} · {periodLabel(period)} · 切换粒度查看真实收支</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Segmented<DashPeriod> value={period} onChange={setPeriod} size="sm" options={PERIOD_OPTIONS} />
+          <PeriodPicker unit={unit} anchor={anchor} today={today} onChange={setPeriod} compact testIdPrefix="dashboard-period" />
           <Link to="/ledger" className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--accent-ink)] hover:underline">
             流水明细 <ChevronRight size={14} />
           </Link>
@@ -429,6 +447,11 @@ export function DashboardPage() {
                 <span className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-0.5 text-[var(--tone-green)]"><TrendingUp size={12} />{formatMoneyShort(periodData.income)}</span>
                   <span className="inline-flex items-center gap-0.5 text-[#98362E]"><TrendingDown size={12} />{formatMoneyShort(periodData.expense)}</span>
+                  <span className="inline-flex items-center gap-0.5 text-[#8A887F]">
+                    {summary.prevStats.count === 0
+                      ? '上期无数据'
+                      : <>较上期 {summary.delta.netDelta >= 0 ? '↑' : '↓'} {summary.delta.netDelta >= 0 ? '+' : '−'}{formatMoneyShort(Math.abs(summary.delta.netDelta))}</>}
+                  </span>
                 </span>
               }
               tone={periodData.net >= 0 ? 'positive' : 'danger'}
@@ -445,7 +468,7 @@ export function DashboardPage() {
             steps={[
               { label: '记一笔', text: '先把今天真实发生的收支入账，保留每一枚小钱的去向。' },
               { label: '排计划', text: '房租、订阅等固定收支提前排进账本，到期一键核销。' },
-              { label: '看结构', text: '按日、月、年回看现金流，看清收入与支出如何变化。' },
+              { label: '看结构', text: '按日、周、月、年回看现金流，看清收入与支出如何变化。' },
               { label: '做预留', text: '先给目标留出资金，再决定这笔大额消费要不要花。' },
             ]}
           />
