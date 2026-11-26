@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   LineChart,
   List,
+  PieChart,
   Plus,
   Settings,
   Sparkles,
@@ -39,6 +40,7 @@ import { GoalsPage } from '../pages/Goals';
 import { DataCenterPage } from '../pages/DataCenter';
 import { SettingsPage } from '../pages/Settings';
 import { AssistantPage } from '../pages/Assistant';
+import { ReportsPage } from '../pages/Reports';
 
 interface BookPage {
   to: string;
@@ -54,6 +56,7 @@ export const BOOK_PAGES: BookPage[] = [
   { to: '/schedules', label: '计划', icon: Calendar, hue: 'var(--tone-amber)' },
   { to: '/insights', label: '洞察', icon: Sparkles, hue: 'var(--tone-violet)' },
   { to: '/forecast', label: '预测', icon: LineChart, hue: 'var(--tone-cyan)' },
+  { to: '/reports', label: '报表', icon: PieChart, hue: 'var(--tone-indigo)' },
   { to: '/assistant', label: 'AI 分析', icon: Bot, hue: 'var(--tone-rose)' },
   { to: '/sandbox', label: '决策沙盘', icon: FlaskConical, hue: 'var(--tone-orange)' },
   { to: '/goals', label: '目标', icon: Target, hue: 'var(--tone-green)' },
@@ -85,6 +88,7 @@ function BookRoutes({ location }: { location: Location }) {
       <Route path="/schedules" element={<SchedulesPage />} />
       <Route path="/insights" element={<InsightsPage />} />
       <Route path="/forecast" element={<ForecastPage />} />
+      <Route path="/reports" element={<ReportsPage />} />
       <Route path="/assistant" element={<AssistantPage />} />
       <Route path="/sandbox" element={<SandboxPage />} />
       <Route path="/goals" element={<GoalsPage />} />

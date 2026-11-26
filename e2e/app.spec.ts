@@ -371,6 +371,15 @@ test('清除本机账本后，云端账户保留并重新进入空账本', async
   await expect(page.getByTestId('auth-page')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '开始记账' })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('dashboard')).toHaveCount(0);
+
+  // 恢复共享页面的可用账本，供后续用例使用；当前仍在设置页路由，需回到总览。
+  await page.getByPlaceholder('例如：日常账户（留空用默认名）').fill('日常账户');
+  await page.getByPlaceholder('0.00').fill('5000');
+  await page.getByPlaceholder('例如：5000').fill('1000');
+  await page.getByRole('button', { name: '开始记账' }).click();
+  await expect(page.getByRole('button', { name: '开始记账' })).toHaveCount(0, { timeout: 30_000 });
+  await page.goto('/#/');
+  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
 });
 
 test('注销账号：两步确认、本机数据销毁且云端账户不可再登录', async ({ browser }) => {
@@ -470,6 +479,16 @@ test('管理员：首登强制改密、用户管理与独立控制台', async ({
   await expect(adminPage.getByTestId('admin-overview')).toBeVisible({ timeout: 30_000 });
   await expect(adminPage.getByTestId('admin-gate')).toHaveCount(0);
   await adminContext.close();
+
+  // 停用再启用会吊销 e2e演示员 的全部服务端会话；共享页面此刻仅靠内存态维持，
+  // 任何 reload 都会回到登录页。这里重新登录，恢复后续用例的共享登录状态。
+  await page.reload();
+  await skipAuthIntro(page);
+  await page.getByTestId('auth-username').fill('e2e演示员');
+  await page.getByTestId('auth-password').fill('e2e-pass-123');
+  await page.getByTestId('auth-submit').click();
+  await expect(page.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
+  await awaitIntro(page);
 });
 
 test('移动端：账本翻页栏与目录抽屉可进入计划页', async ({ browser }) => {
@@ -559,7 +578,7 @@ test('数据不足：新开户未登记覆盖区间时预测与沙盘显示数�
 test('流水页切换「周」：URL 记录并在刷新后保持，上一周期可用', async () => {
   await page.goto('/#/ledger');
   await expect(page.getByTestId('ledger')).toBeVisible();
-  const picker = page.getByRole('group', { name: '统计周期' });
+  const picker = page.getByTestId('ledger').getByRole('group', { name: '统计周期' });
   await picker.getByRole('button', { name: '周', exact: true }).click();
   await expect(page).toHaveURL(/unit=week/);
   expect(page.url().match(/anchor=([^&]*)/)?.[1]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -589,7 +608,7 @@ test('洞察页周期切换：年视图小额卡与异常徽标、日视图候�
   await page.goto('/#/insights');
   await expect(page.getByTestId('insights')).toBeVisible();
   await expect(page.getByTestId('insights-overview')).toContainText('本期：支出');
-  const picker = page.getByRole('group', { name: '统计周期' });
+  const picker = page.getByTestId('insights').getByRole('group', { name: '统计周期' });
   await picker.getByRole('button', { name: '年', exact: true }).click();
   const year = new Date().getFullYear();
   await expect(page.getByText(`${year}年 · 单笔 ≤`, { exact: false })).toBeVisible();
@@ -604,6 +623,76 @@ test('洞察页周期切换：年视图小额卡与异常徽标、日视图候�
   await expect(page.getByText('来自全部历史，不受周期影响', { exact: false })).toBeVisible();
 });
 
+test('报表：侧栏入口进入，4 张 KPI 与预算卡可见', async () => {
+  await page.goto('/');
+  await expect(page.getByTestId('dashboard')).toBeVisible();
+  await page.getByTestId('book-tab-reports').click();
+  await expect(page).toHaveURL(/#\/reports$/);
+  await expect(page.getByTestId('reports')).toBeVisible();
+  await expect(page.getByTestId('reports-kpi')).toBeVisible();
+  await expect(page.getByTestId('report-kpi-income')).toBeVisible();
+  await expect(page.getByTestId('report-kpi-expense')).toBeVisible();
+  await expect(page.getByTestId('report-kpi-net')).toBeVisible();
+  await expect(page.getByTestId('report-kpi-rate')).toBeVisible();
+});
+
+test('报表：示例数据预算 ¥4,200、切周折算变小、表格 12 行、CSV 下载', async ({ browser }) => {
+  const demo = await browser.newContext();
+  const dp = await demo.newPage();
+  await dp.goto('/');
+  await expect(dp.getByTestId('auth-page')).toBeVisible();
+  await dp.getByTestId('auth-go-register').click();
+  await expect(dp.getByTestId('auth-confirm')).toBeVisible();
+  await dp.getByTestId('auth-username').fill('e2e报表员');
+  await dp.getByTestId('auth-password').fill('e2e-pass-456');
+  await dp.getByTestId('auth-confirm').fill('e2e-pass-456');
+  await dp.getByTestId('auth-recovery-question').selectOption({ label: '我的第一只宠物叫什么名字？' });
+  await dp.getByTestId('auth-recovery-answer').fill('e2e小猫');
+  await dp.getByTestId('auth-submit').click();
+  await expect(dp).toHaveURL(/#\/login$/);
+  await expect(dp.getByTestId('auth-registered-note')).toBeVisible();
+  await dp.getByTestId('auth-username').fill('e2e报表员');
+  await dp.getByTestId('auth-password').fill('e2e-pass-456');
+  await dp.getByTestId('auth-submit').click();
+  await expect(dp.getByRole('button', { name: '开始记账' })).toBeVisible({ timeout: 60_000 });
+  await dp.getByTestId('start-demo').click();
+  await expect(dp.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
+
+  await dp.goto('/#/reports');
+  await expect(dp.getByTestId('reports')).toBeVisible();
+  await expect(dp.getByTestId('report-budget')).toBeVisible();
+  await expect(dp.getByTestId('report-budget-monthly')).toHaveText('¥4,200.00');
+  await expect(dp.getByTestId('report-budget')).toContainText('%');
+
+  const picker = dp.getByTestId('reports').getByRole('group', { name: '统计周期' });
+  await picker.getByRole('button', { name: '周', exact: true }).click();
+  await expect(dp).toHaveURL(/unit=week/);
+  await expect(dp.getByTestId('report-budget-prorated')).not.toHaveText('4,200');
+  await expect(dp.getByTestId('report-table').locator('tbody tr')).toHaveCount(12);
+
+  const [download] = await Promise.all([
+    dp.waitForEvent('download'),
+    dp.getByTestId('report-export').click(),
+  ]);
+  expect(download.suggestedFilename()).toContain('moneyflow-report');
+  await demo.close();
+});
+
+test('报表：移动端 375×812 从目录进入', async ({ browser }) => {
+  const mobile = await browser.newContext({
+    viewport: { width: 375, height: 812 },
+    isMobile: true,
+    hasTouch: true,
+    locale: 'zh-CN',
+  });
+  const mp = await mobile.newPage();
+  await loadApp(mp, 'e2e移动报表');
+  await mp.getByTestId('book-toc').click();
+  await mp.getByTestId('book-toc-reports').click();
+  await expect(mp.getByTestId('reports')).toBeVisible();
+  await mobile.close();
+});
+
 test('移动端 375×812：统计周期切换器可见，日期输入隐藏', async ({ browser }) => {
   const mobile = await browser.newContext({
     viewport: { width: 375, height: 812 },
@@ -615,7 +704,7 @@ test('移动端 375×812：统计周期切换器可见，日期输入隐藏', as
   await loadApp(mp, 'e2e移动周期');
   await mp.goto('/#/ledger');
   await expect(mp.getByTestId('ledger')).toBeVisible();
-  const picker = mp.getByRole('group', { name: '统计周期' });
+  const picker = mp.getByTestId('ledger').getByRole('group', { name: '统计周期' });
   await expect(picker).toBeVisible();
   for (const label of ['日', '周', '月', '年']) {
     await expect(picker.getByRole('button', { name: label, exact: true })).toBeVisible();
@@ -656,5 +745,4 @@ test('示例数据：新用户先进示例，退出后回到引导页', async ({
   await expect(dp.getByTestId('dashboard')).toHaveCount(0);
   await expect(dp.getByTestId('start-demo')).toBeVisible();
   await demo.close();
-});
 });
