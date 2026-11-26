@@ -1,12 +1,17 @@
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, Lock, ShieldCheck, Smartphone, User, UserPlus } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { findAccountByIdentifier, RECOVERY_QUESTIONS, resetPasswordWithAnswer, type AccountLookup } from '../data/auth';
 import { formatCN, todayISO } from '../domain/days';
+import { isReducedMotion } from '../motion/gsap';
+import { AuthIntro } from './AuthIntro';
 import { CoinRain } from './CoinRain';
 import { PalettePicker } from './PalettePicker';
 import { cn } from './ui';
+
+/** 每次整页加载只播一次；登录 / 注册之间切换不重播。 */
+let authIntroSeen = false;
 
 interface MiniCoin {
   id: number;
@@ -242,6 +247,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const location = useLocation();
   const registeredName = (location.state as { registeredName?: string } | null)?.registeredName ?? '';
 
+  const [introOpen, setIntroOpen] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -262,6 +268,12 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const [forgotShowPwd, setForgotShowPwd] = useState(false);
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [forgotBusy, setForgotBusy] = useState(false);
+
+  useLayoutEffect(() => {
+    if (authIntroSeen || isReducedMotion()) return;
+    authIntroSeen = true;
+    setIntroOpen(true);
+  }, []);
 
   useEffect(() => {
     setUsername('');
@@ -399,6 +411,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
   return (
     <div className="auth-scene" data-testid="auth-page">
+      {introOpen && <AuthIntro onDone={() => setIntroOpen(false)} />}
       <CoinRain />
       <span className="auth-glow auth-glow-a" aria-hidden="true" />
       <span className="auth-glow auth-glow-b" aria-hidden="true" />

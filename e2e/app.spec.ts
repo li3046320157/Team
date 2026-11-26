@@ -10,9 +10,18 @@ async function awaitIntro(target: Page) {
   await expect(target.getByTestId('ledger-intro')).toBeHidden({ timeout: 20_000 });
 }
 
+async function skipAuthIntro(target: Page) {
+  const intro = target.getByTestId('auth-intro');
+  if (await intro.isVisible().catch(() => false)) {
+    await target.getByTestId('auth-intro-skip').click();
+  }
+  await expect(intro).toBeHidden();
+}
+
 async function loadApp(target: Page, username = 'e2e演示员', phone?: string) {
   await target.goto('/');
   await expect(target.getByTestId('auth-page')).toBeVisible();
+  await skipAuthIntro(target);
   await target.getByTestId('auth-go-register').click();
   await expect(target).toHaveURL(/#\/register$/);
   await expect(target.getByTestId('auth-confirm')).toBeVisible();
