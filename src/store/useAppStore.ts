@@ -4,22 +4,19 @@ import type { Dataset, DataMode } from '../domain/types';
 import { todayISO } from '../domain/days';
 import { clearDataset, describeDbError, readDataset, writeDataset, setPersonalDbName } from '../data/db';
 import {
-  changeUserPassword,
-  clearSession,
-  getUserById,
-  loginUser,
-  personalDbNameFor,
-  readSession,
-  registerUser,
-  storeSession,
-  updateRecoverySetup,
-  updateUsername,
-  updateUserPhone,
-  type AuthUser,
-  type RegistrationDetails,
-} from '../data/auth';
+  apiBindPhone,
+  apiChangePassword,
+  apiLogin,
+  apiLogout,
+  apiMe,
+  apiRegister,
+  apiUpdateProfile,
+  apiUpdateRecovery,
+} from '../data/account-api';
+import { ApiError, apiErrorMessage, setSessionExpiredHandler } from '../data/api-core';
+import { personalDbNameFor, type AuthUser, type RegistrationDetails } from '../data/auth';
 import { createEmptyDataset } from '../data/defaults';
-import { applyCleanSlateOnce } from '../data/wipe';
+import { applyCleanSlateOnce, retireLegacyLocalAuth } from '../data/wipe';
 import { addAccount, applyOnboarding, type AccountInput } from '../services/mutations';
 import { runCalibrationOnDataset, saveDailySnapshot, saveManualSnapshot, type CalibrationOutcome } from '../services/snapshots';
 
@@ -34,6 +31,7 @@ interface AppState {
   mode: DataMode;
   user: AuthUser | null;
   authReady: boolean;
+  authError: string | null;
   dataset: Dataset | null;
   loading: boolean;
   ready: boolean;
@@ -48,7 +46,8 @@ interface AppState {
   bindPhone: (phone: string) => Promise<string | null>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<string | null>;
   updateRecovery: (currentPassword: string, question: string, answer: string) => Promise<string | null>;
-  logout: () => void;
+  applyUser: (user: AuthUser) => void;
+  logout: () => Promise<string | null>;
   init: () => Promise<void>;
   apply: (mutator: (dataset: Dataset) => Dataset, successMessage?: string) => Promise<boolean>;
   replaceDataset: (dataset: Dataset, successMessage?: string) => Promise<boolean>;
@@ -111,10 +110,23 @@ async function prepareDataset(mode: DataMode): Promise<Dataset> {
   return dataset;
 }
 
+function signedOutPatch() {
+  return {
+    user: null,
+    dataset: null,
+    ready: false,
+    loading: false,
+    error: null,
+    introPending: false,
+    authError: null,
+  } as const;
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   mode: 'personal',
   user: null,
   authReady: false,
+  authError: null,
   dataset: null,
   loading: false,
   ready: false,
@@ -125,35 +137,61 @@ export const useAppStore = create<AppState>((set, get) => ({
   finishIntro: () => set({ introPending: false }),
 
   boot: async () => {
-    await applyCleanSlateOnce();
+    set({ authReady: false, authError: null });
+    try {
+      await Promise.all([applyCleanSlateOnce(), retireLegacyLocalAuth()]);
+    } catch {
+      // 本地清理失败不应阻断云端登录。
+    }
     setupChannel();
-    const sessionId = readSession();
-    const user = sessionId ? await getUserById(sessionId).catch(() => null) : null;
-    if (user) setPersonalDbName(personalDbNameFor(user.id));
-    set({ user, authReady: true });
-    if (user) await get().init();
+    try {
+      const user = await apiMe();
+      if (!user) {
+        setPersonalDbName('moneyflow-personal');
+        set({ ...signedOutPatch(), authReady: true });
+        return;
+      }
+      if (user.role === 'admin') {
+        setPersonalDbName('moneyflow-personal');
+        set({ ...signedOutPatch(), user, authReady: true });
+        return;
+      }
+      setPersonalDbName(personalDbNameFor(user.id));
+      set({ user, authReady: true, dataset: null, ready: false, loading: false, error: null, authError: null });
+      await get().init();
+    } catch (error) {
+      set({
+        ...signedOutPatch(),
+        authReady: true,
+        authError: apiErrorMessage(error, '无法连接账户服务，请检查网络后重试'),
+      });
+    }
   },
 
   register: async (username, password, details) => {
     try {
-      await registerUser(username, password, details);
+      await apiRegister(username, password, details);
       return null;
     } catch (error) {
-      return error instanceof Error ? error.message : '注册失败，请重试';
+      return apiErrorMessage(error, '注册失败，请重试');
     }
   },
 
   login: async (identifier, password) => {
     try {
-      const user = await loginUser(identifier, password);
+      const user = await apiLogin(identifier, password);
+      if (user.role === 'admin') {
+        setPersonalDbName('moneyflow-personal');
+        set({ user, dataset: null, ready: false, loading: false, error: null, authError: null, introPending: false });
+        return null;
+      }
       setPersonalDbName(personalDbNameFor(user.id));
-      storeSession(user.id);
-      set({ user, error: null, introPending: true });
+      set({ user, dataset: null, ready: false, loading: false, error: null, authError: null, introPending: true });
       await get().init();
       get().notify(`欢迎回来，${user.username}`, 'success');
       return null;
     } catch (error) {
-      return error instanceof Error ? error.message : '登录失败，请重试';
+      return apiErrorMessage(error, '登录失败，请重试');
     }
   },
 
@@ -161,11 +199,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const state = get();
     if (!state.user) return '请先登录';
     try {
-      const user = await updateUsername(state.user.id, username);
+      const user = await apiUpdateProfile(username);
       set({ user });
       return null;
     } catch (error) {
-      return error instanceof Error ? error.message : '修改失败，请重试';
+      return apiErrorMessage(error, '修改失败，请重试');
     }
   },
 
@@ -173,11 +211,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const state = get();
     if (!state.user) return '请先登录';
     try {
-      const user = await updateUserPhone(state.user.id, phone);
+      const user = await apiBindPhone(phone);
       set({ user });
       return null;
     } catch (error) {
-      return error instanceof Error ? error.message : '绑定手机号失败，请重试';
+      return apiErrorMessage(error, '绑定手机号失败，请重试');
     }
   },
 
@@ -185,10 +223,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     const state = get();
     if (!state.user) return '请先登录';
     try {
-      await changeUserPassword(state.user.id, currentPassword, newPassword);
+      await apiChangePassword(currentPassword, newPassword);
       return null;
     } catch (error) {
-      return error instanceof Error ? error.message : '修改密码失败，请重试';
+      return apiErrorMessage(error, '修改密码失败，请重试');
     }
   },
 
@@ -196,25 +234,44 @@ export const useAppStore = create<AppState>((set, get) => ({
     const state = get();
     if (!state.user) return '请先登录';
     try {
-      const user = await updateRecoverySetup(state.user.id, currentPassword, question, answer);
+      const user = await apiUpdateRecovery(currentPassword, question, answer);
       set({ user });
       return null;
     } catch (error) {
-      return error instanceof Error ? error.message : '保存找回问题失败，请重试';
+      return apiErrorMessage(error, '保存找回问题失败，请重试');
     }
   },
 
-  logout: () => {
-    clearSession();
+  applyUser: (user) => set({ user }),
+
+  logout: async () => {
+    try {
+      await apiLogout();
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'logout_unconfirmed') {
+        // 服务端已下发清除 Cookie，但会话撤销未确认；本机仍先退出。
+        setPersonalDbName('moneyflow-personal');
+        set({ ...signedOutPatch() });
+        get().notify('已退出本机登录，服务器会话撤销未确认', 'info');
+        return null;
+      }
+      const message = apiErrorMessage(error, '退出登录失败，请检查网络后重试');
+      get().notify(message, 'error');
+      return message;
+    }
     setPersonalDbName('moneyflow-personal');
-    set({ user: null, dataset: null, ready: false, loading: false, error: null, introPending: false });
+    set({ ...signedOutPatch() });
     get().notify('已退出登录', 'info');
+    return null;
   },
 
   init: async () => {
     setupChannel();
     const state = get();
-    if (state.mode === 'personal' && !state.user) return;
+    if (!state.user || state.user.role !== 'user') {
+      set({ loading: false });
+      return;
+    }
     set({ loading: true, error: null });
     try {
       const mode = get().mode;
@@ -351,4 +408,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearToast: () => set({ toast: null }),
   dismissError: () => set({ error: null }),
 }));
+
+setSessionExpiredHandler(() => {
+  const state = useAppStore.getState();
+  if (!state.user) return;
+  setPersonalDbName('moneyflow-personal');
+  useAppStore.setState({ ...signedOutPatch() });
+  state.notify('登录已过期，请重新登录', 'error');
+});
 
