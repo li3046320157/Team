@@ -19,16 +19,23 @@ function collectRevealTargets(root: HTMLElement): HTMLElement[] {
 /**
  * 页面动效：路由切换淡入 + 视口外内容进入视口时渐变显现。
  * 只隐藏首屏之外的目标，已可见内容不闪烁；滚动显现只播放一次。
+ * 传入 scrollRef 时以书页内部滚动容器为准，否则使用窗口滚动。
  */
-export function usePageReveal(scopeRef: RefObject<HTMLDivElement | null>, pageKey: string) {
+export function usePageReveal(
+  scopeRef: RefObject<HTMLDivElement | null>,
+  pageKey: string,
+  scrollRef?: RefObject<HTMLDivElement | null>,
+) {
   useGSAP(() => {
     const root = scopeRef.current;
     if (!root) return;
+    const scroller = scrollRef?.current ?? null;
     const reduce = isReducedMotion();
     const batches: ScrollTrigger[] = [];
 
     // 先复位滚动，再按首屏位置决定哪些内容需要滚动显现
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    if (scroller) scroller.scrollTop = 0;
+    else window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 
     gsap.fromTo(
       root,
@@ -42,7 +49,9 @@ export function usePageReveal(scopeRef: RefObject<HTMLDivElement | null>, pageKe
       },
     );
 
-    const enterLine = window.innerHeight * VIEW_EDGE;
+    const enterLine = scroller
+      ? scroller.getBoundingClientRect().bottom * VIEW_EDGE
+      : window.innerHeight * VIEW_EDGE;
     const pending: HTMLElement[] = [];
     for (const el of collectRevealTargets(root)) {
       if (el.getBoundingClientRect().top < enterLine) continue;
@@ -57,6 +66,7 @@ export function usePageReveal(scopeRef: RefObject<HTMLDivElement | null>, pageKe
         ...ScrollTrigger.batch(pending, {
           start: 'top 90%',
           once: true,
+          ...(scroller ? { scroller } : {}),
           onEnter: (batch) => {
             const elements = batch as HTMLElement[];
             gsap.to(elements, {
