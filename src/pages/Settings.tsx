@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react';
-import { CalendarRange, Check, Info, KeyRound, Landmark, Palette, Plus, Save, Settings2, ShieldCheck, Sparkles, Trash2, UserRound } from 'lucide-react';
+import { CalendarRange, Check, HelpCircle, Info, KeyRound, Landmark, Palette, Plus, Save, Settings2, ShieldCheck, Smartphone, Sparkles, Trash2, UserRound } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { RECOVERY_QUESTIONS } from '../data/auth';
 import { addDaysISO, formatCN, todayISO } from '../domain/days';
 import { formatMoney, parseMoneyInput } from '../domain/money';
 import { validateCoverage } from '../domain/ledger';
@@ -30,7 +31,9 @@ export function SettingsPage() {
   const notify = useAppStore((s) => s.notify);
   const user = useAppStore((s) => s.user);
   const updateProfile = useAppStore((s) => s.updateProfile);
+  const bindPhone = useAppStore((s) => s.bindPhone);
   const changePassword = useAppStore((s) => s.changePassword);
+  const updateRecovery = useAppStore((s) => s.updateRecovery);
   const logout = useAppStore((s) => s.logout);
   const today = todayISO();
   const s = dataset.settings;
@@ -69,11 +72,19 @@ export function SettingsPage() {
   const [profileName, setProfileName] = useState(user?.username ?? '');
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [profilePhone, setProfilePhone] = useState(user?.phone ?? '');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [phoneSaving, setPhoneSaving] = useState(false);
   const [currentPwd, setCurrentPwd] = useState('');
   const [newPwd, setNewPwd] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
   const [pwdError, setPwdError] = useState<string | null>(null);
   const [pwdSaving, setPwdSaving] = useState(false);
+  const [recCurrentPwd, setRecCurrentPwd] = useState('');
+  const [recQuestion, setRecQuestion] = useState(user?.recoveryQuestion ?? '');
+  const [recAnswer, setRecAnswer] = useState('');
+  const [recError, setRecError] = useState<string | null>(null);
+  const [recSaving, setRecSaving] = useState(false);
 
   const save = async () => {
     setError(null);
@@ -192,6 +203,19 @@ export function SettingsPage() {
     window.setTimeout(() => window.location.reload(), 700);
   };
 
+  const savePhone = async () => {
+    setPhoneError(null);
+    const digits = profilePhone.replace(/[\s-]/g, '');
+    if (!digits && !user?.phone) return setPhoneError('请输入 11 位手机号');
+    if (digits && digits === user?.phone) return setPhoneError('该手机号已绑定');
+    setPhoneSaving(true);
+    const message = await bindPhone(digits);
+    setPhoneSaving(false);
+    if (message) return setPhoneError(message);
+    setProfilePhone(digits);
+    notify(digits ? '手机号已绑定，可用于登录' : '已解除手机号绑定', 'success');
+  };
+
   const submitPassword = async () => {
     setPwdError(null);
     if (!currentPwd) return setPwdError('请填写当前密码');
@@ -208,11 +232,25 @@ export function SettingsPage() {
     }, 900);
   };
 
+  const submitRecovery = async () => {
+    setRecError(null);
+    if (!recQuestion) return setRecError('请选择找回问题');
+    if (!recCurrentPwd) return setRecError('请填写当前密码以验证身份');
+    if (recAnswer.trim().length < 2 || recAnswer.trim().length > 40) return setRecError('找回答案需为 2–40 个字符');
+    setRecSaving(true);
+    const message = await updateRecovery(recCurrentPwd, recQuestion, recAnswer);
+    setRecSaving(false);
+    if (message) return setRecError(message);
+    setRecCurrentPwd('');
+    setRecAnswer('');
+    notify('找回问题已保存，忘记密码时可自助重置', 'success');
+  };
+
   return (
     <div className="fade-in" data-testid="settings">
       <PageHeader
         title="个人设置"
-        description="管理个人资料与登录密码，并调整安全线、月预算、账户和检测参数。参数会影响预测、异常检测、周期识别、目标分配与沙盘，所有金额以整数分存储。"
+        description="管理个人资料、手机号、登录密码与找回问题，并调整安全线、月预算、账户和检测参数。参数会影响预测、异常检测、周期识别、目标分配与沙盘，所有金额以整数分存储。"
         actions={(
           <>
             {savedAt && <span key={savedAt} className="badge-pop inline-flex"><Badge tone="teal"><Check size={11} /> {savedAt} 已保存</Badge></span>}
@@ -268,7 +306,7 @@ export function SettingsPage() {
           <InfoNote>账户本身不支持归档操作入口；期初日期决定余额计算的起点，历史交易不会早于期初。</InfoNote>
         </Card>
 
-        <Card className="rise" style={{ '--i': 1.5 } as CSSProperties} title="个人资料" subtitle="用户名会显示在左上角账户菜单" action={<UserRound size={15} className="text-[var(--accent-ink)]" />}>
+        <Card className="rise" style={{ '--i': 1.5 } as CSSProperties} title="个人资料" subtitle="用户名显示在左上角账户菜单，绑定手机号后也可用它登录" action={<UserRound size={15} className="text-[var(--accent-ink)]" />}>
           <div className="space-y-3">
             <Field label="用户名" hint="2–20 个字符，支持中文、字母、数字、下划线与连字符；保存后页面会自动刷新。">
               <input
@@ -286,6 +324,32 @@ export function SettingsPage() {
                 <Save size={13} /> {profileSaving ? '保存中…' : '保存资料'}
               </Button>
               <span className="text-[10.5px] text-[#8A887F]">改名不影响账本、目标与备份。</span>
+            </div>
+            <div className="border-t border-dashed border-[#E0D8C8] pt-3">
+              <Field label="手机号（可选）" hint="11 位手机号，绑定后可用它代替用户名登录；留空保存即解除绑定。">
+                <div className="relative">
+                  <Smartphone size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#A3A097]" />
+                  <input
+                    className="input !pl-9"
+                    inputMode="tel"
+                    value={profilePhone}
+                    maxLength={11}
+                    autoComplete="tel"
+                    placeholder="未绑定"
+                    onChange={(e) => setProfilePhone(e.target.value)}
+                    data-testid="profile-phone"
+                  />
+                </div>
+              </Field>
+              {phoneError && <p className="mt-2 rounded-lg bg-[#FCF1EF] px-3 py-2 text-[12px] text-[#98362E]" role="alert" data-testid="phone-error">{phoneError}</p>}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Button variant="secondary" size="sm" onClick={() => void savePhone()} disabled={phoneSaving} data-testid="save-phone">
+                  <Smartphone size={13} /> {phoneSaving ? '保存中…' : '保存手机号'}
+                </Button>
+                <span className="text-[10.5px] text-[#8A887F]">
+                  {user?.phone ? `已绑定 ${user.phone}` : '绑定后可用手机号登录与找回账户'}
+                </span>
+              </div>
             </div>
           </div>
         </Card>
@@ -329,6 +393,61 @@ export function SettingsPage() {
               <KeyRound size={13} /> {pwdSaving ? '修改中…' : '修改密码'}
             </Button>
             <InfoNote tone="warn">密码只以加盐哈希保存在这台设备。修改后所有打开的本机标签页都需要重新登录，请妥善保管新密码。</InfoNote>
+          </div>
+        </Card>
+
+        <Card className="rise" style={{ '--i': 1.7 } as CSSProperties} title="密码找回" subtitle="忘记密码时在登录页回答问题即可重置，不需要清除账本" action={<HelpCircle size={15} className="text-[var(--accent-ink)]" />}>
+          <div className="space-y-3">
+            <p
+              className={cn(
+                'rounded-lg border px-3 py-2 text-[11.5px] leading-relaxed',
+                user?.recoveryQuestion
+                  ? 'border-[#E4E0D8] bg-[#FCFBF8] text-[#6B6A63]'
+                  : 'border-[#F3D9B5] bg-[#FDF6EA] text-[#8A5A12]',
+              )}
+              data-testid="recovery-status"
+            >
+              {user?.recoveryQuestion ? `当前找回问题：${user.recoveryQuestion}` : '尚未设置找回问题；忘记密码将无法自助重置。'}
+            </p>
+            <Field label="当前密码" hint="修改找回问题前需要验证身份。">
+              <input
+                className="input"
+                type="password"
+                value={recCurrentPwd}
+                autoComplete="current-password"
+                onChange={(e) => setRecCurrentPwd(e.target.value)}
+                data-testid="recovery-current-password"
+              />
+            </Field>
+            <Field label="找回问题">
+              <select
+                className="select"
+                value={recQuestion}
+                onChange={(e) => setRecQuestion(e.target.value)}
+                data-testid="recovery-question"
+              >
+                <option value="">选择找回问题</option>
+                {RECOVERY_QUESTIONS.map((q) => (
+                  <option key={q} value={q}>{q}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="答案" hint="2–40 个字符，大小写不敏感；答案会加盐哈希，不会明文保存。">
+              <input
+                className="input"
+                value={recAnswer}
+                maxLength={40}
+                autoComplete="off"
+                onChange={(e) => setRecAnswer(e.target.value)}
+                placeholder="填写一个只有你知道的答案"
+                data-testid="recovery-answer"
+              />
+            </Field>
+            {recError && <p className="rounded-lg bg-[#FCF1EF] px-3 py-2 text-[12px] text-[#98362E]" role="alert" data-testid="recovery-error">{recError}</p>}
+            <Button variant="primary" size="sm" onClick={() => void submitRecovery()} disabled={recSaving} data-testid="save-recovery">
+              <ShieldCheck size={13} /> {recSaving ? '保存中…' : '保存找回问题'}
+            </Button>
+            <InfoNote>手机号与找回问题只保存在本机；回答正确后可在登录页直接设置新密码，账本数据不受影响。</InfoNote>
           </div>
         </Card>
 

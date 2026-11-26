@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, Lock, ShieldCheck, User, UserPlus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, Lock, ShieldCheck, Smartphone, User, UserPlus } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import { findAccountByIdentifier, RECOVERY_QUESTIONS, resetPasswordWithAnswer, type AccountLookup } from '../data/auth';
 import { formatCN, todayISO } from '../domain/days';
 import { CoinRain } from './CoinRain';
 import { PalettePicker } from './PalettePicker';
@@ -236,6 +237,7 @@ function PasswordInput({
 export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const login = useAppStore((s) => s.login);
   const register = useAppStore((s) => s.register);
+  const notify = useAppStore((s) => s.notify);
   const navigate = useNavigate();
   const location = useLocation();
   const registeredName = (location.state as { registeredName?: string } | null)?.registeredName ?? '';
@@ -243,17 +245,41 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [phoneInput, setPhoneInput] = useState('');
+  const [recoveryQuestion, setRecoveryQuestion] = useState('');
+  const [recoveryAnswer, setRecoveryAnswer] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [shakeKey, setShakeKey] = useState(0);
 
+  const [forgot, setForgot] = useState(false);
+  const [forgotId, setForgotId] = useState('');
+  const [lookup, setLookup] = useState<AccountLookup | null>(null);
+  const [forgotAnswer, setForgotAnswer] = useState('');
+  const [forgotNewPwd, setForgotNewPwd] = useState('');
+  const [forgotConfirm, setForgotConfirm] = useState('');
+  const [forgotShowPwd, setForgotShowPwd] = useState(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const [forgotBusy, setForgotBusy] = useState(false);
+
   useEffect(() => {
     setUsername('');
     setPassword('');
     setConfirm('');
+    setPhoneInput('');
+    setRecoveryQuestion('');
+    setRecoveryAnswer('');
     setError(null);
     setShowPassword(false);
+    setForgot(false);
+    setForgotId('');
+    setLookup(null);
+    setForgotAnswer('');
+    setForgotNewPwd('');
+    setForgotConfirm('');
+    setForgotError(null);
+    setForgotShowPwd(false);
   }, [mode]);
 
   const fail = (message: string) => {
@@ -275,13 +301,99 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
       setBusy(false);
       if (failure) fail(failure);
     } else {
-      const failure = await register(username, password);
+      const failure = await register(username, password, {
+        phone: phoneInput,
+        question: recoveryQuestion,
+        answer: recoveryAnswer,
+      });
       setBusy(false);
       if (failure) {
         fail(failure);
         return;
       }
       navigate('/login', { state: { registeredName: username.trim() } });
+    }
+  };
+
+  const openForgot = () => {
+    setForgot(true);
+    setError(null);
+    setUsername('');
+    setPassword('');
+    setConfirm('');
+    setShowPassword(false);
+    setForgotId('');
+    setLookup(null);
+    setForgotAnswer('');
+    setForgotNewPwd('');
+    setForgotConfirm('');
+    setForgotShowPwd(false);
+    setForgotError(null);
+  };
+
+  const closeForgot = () => {
+    setForgot(false);
+    setForgotId('');
+    setLookup(null);
+    setForgotAnswer('');
+    setForgotNewPwd('');
+    setForgotConfirm('');
+    setForgotShowPwd(false);
+    setForgotError(null);
+    setError(null);
+  };
+
+  const lookupAccount = async (event: FormEvent) => {
+    event.preventDefault();
+    if (forgotBusy) return;
+    setForgotError(null);
+    const value = forgotId.trim();
+    if (!value) {
+      setForgotError('请输入用户名或已绑定的手机号');
+      return;
+    }
+    setForgotBusy(true);
+    try {
+      const hint = await findAccountByIdentifier(value);
+      if (!hint) {
+        setLookup(null);
+        setForgotError('没有找到匹配的账户，请检查用户名或手机号');
+        return;
+      }
+      setLookup(hint);
+      setForgotAnswer('');
+      setForgotNewPwd('');
+      setForgotConfirm('');
+    } catch (err) {
+      setForgotError(err instanceof Error ? err.message : '查询失败，请重试');
+    } finally {
+      setForgotBusy(false);
+    }
+  };
+
+  const submitReset = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!lookup || forgotBusy) return;
+    setForgotError(null);
+    if (forgotNewPwd.length < 6 || forgotNewPwd.length > 64) {
+      setForgotError('新密码长度需为 6–64 个字符');
+      return;
+    }
+    if (forgotNewPwd !== forgotConfirm) {
+      setForgotError('两次输入的新密码不一致');
+      return;
+    }
+    setForgotBusy(true);
+    try {
+      const user = await resetPasswordWithAnswer(lookup.username, forgotAnswer, forgotNewPwd);
+      closeForgot();
+      setUsername(user.username);
+      setPassword('');
+      notify(`账户「${user.username}」密码已重置，请使用新密码登录`, 'success');
+    } catch (err) {
+      setForgotError(err instanceof Error ? err.message : '重置失败，请重试');
+    } finally {
+      setForgotBusy(false);
     }
   };
 
@@ -318,109 +430,292 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             <span className="ledger-seal" aria-hidden="true">账</span>
             <header className="ledger-head">
               <p className="ledger-kicker">金钱流水 · 本地账本</p>
-              <h2 className="ledger-title">{mode === 'login' ? '欢迎回来' : '创建本地账户'}</h2>
-              <p className="ledger-date">{formatCN(todayISO())} · {mode === 'login' ? '对账入账' : '开立新户'}</p>
+              <h2 className="ledger-title">{forgot ? '找回密码' : mode === 'login' ? '欢迎回来' : '创建本地账户'}</h2>
+              <p className="ledger-date">{formatCN(todayISO())} · {forgot ? '核对身份' : mode === 'login' ? '对账入账' : '开立新户'}</p>
             </header>
             <div className="ledger-rule" aria-hidden="true" />
 
-            <div className="mt-3">
-              {mode === 'register' && (
-                <button type="button" className="ledger-back" onClick={() => navigate('/login')} data-testid="auth-go-login">
+            {forgot ? (
+              <div className="mt-3" data-testid="auth-forgot-panel">
+                <button type="button" className="ledger-back" onClick={closeForgot} data-testid="auth-forgot-back">
                   <ArrowLeft size={14} /> 返回登录
                 </button>
-              )}
-              <p className="mt-1 text-[12px] leading-relaxed text-[#6B6A63]">
-                {mode === 'login' ? '登录你的本地账本，继续查看现金流。' : '账户与账本只保存在这台设备的浏览器里，注册后需登录进入。'}
-              </p>
-              {mode === 'register' && (
-                <ul className="ledger-note mt-2.5">
-                  <li><CheckCircle2 size={13} className="shrink-0 text-[var(--accent)]" /> 密码加盐哈希，仅存本机浏览器</li>
-                  <li><CheckCircle2 size={13} className="shrink-0 text-[var(--accent)]" /> 每个用户独立账本，互不可见</li>
-                  <li><CheckCircle2 size={13} className="shrink-0 text-[var(--accent)]" /> 注册完成后返回登录页进入账本</li>
-                </ul>
-              )}
-            </div>
-
-            {mode === 'login' && registeredName && (
-              <p className="fade-in mt-3 flex items-start gap-2 rounded-lg border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-2 text-[12px] leading-relaxed text-[var(--accent-ink)]" data-testid="auth-registered-note">
-                <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
-                注册成功！账户「{registeredName}」已创建，请重新输入用户名和密码登录。
-              </p>
-            )}
-
-            <form className="mt-4 space-y-3.5" onSubmit={(e) => void submit(e)}>
-              <label className="block">
-                <span className="label">用户名</span>
-                <div className="relative">
-                  <User size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#A3A097]" />
-                  <input
-                    className="input !pl-9"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="2–20 个字符，如：xiaoming"
-                    maxLength={20}
-                    autoComplete="username"
-                    data-testid="auth-username"
-                  />
-                </div>
-              </label>
-              <label className="block">
-                <span className="label">密码</span>
-                <PasswordInput
-                  value={password}
-                  onChange={setPassword}
-                  placeholder="至少 6 位，建议字母加数字"
-                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                  testId="auth-password"
-                  show={showPassword}
-                  onToggle={() => setShowPassword((v) => !v)}
-                />
-              </label>
-              {mode === 'register' && (
-                <label className="block fade-in">
-                  <span className="label">确认密码</span>
-                  <div className="relative">
-                    <KeyRound size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#A3A097]" />
-                    <input
-                      className="input !pl-9"
-                      type={showPassword ? 'text' : 'password'}
-                      value={confirm}
-                      onChange={(e) => setConfirm(e.target.value)}
-                      placeholder="再输入一次密码"
-                      maxLength={64}
-                      autoComplete="new-password"
-                      data-testid="auth-confirm"
-                    />
-                  </div>
-                </label>
-              )}
-
-              {error && (
-                <p key={shakeKey} className="shake rounded-lg bg-[#FCF1EF] px-3 py-2 text-[12px] text-[#98362E]" role="alert" data-testid="auth-error">
-                  {error}
+                <p className="mt-1 text-[12px] leading-relaxed text-[#6B6A63]">
+                  {lookup
+                    ? '核对找回问题后设置新密码，账本数据不会被删除。'
+                    : '输入用户名或已绑定的手机号，用注册时设置的找回问题重置密码。'}
                 </p>
-              )}
 
-              <button type="submit" className="btn btn-primary w-full !py-3" disabled={busy} data-testid="auth-submit">
-                {busy ? '请稍候…' : mode === 'login' ? '登录并进入账本' : '注册账户'}
-                {!busy && <ArrowRight size={15} />}
-              </button>
-            </form>
+                {!lookup ? (
+                  <form className="mt-4 space-y-3.5" onSubmit={(e) => void lookupAccount(e)}>
+                    <label className="block">
+                      <span className="label">用户名或手机号</span>
+                      <div className="relative">
+                        <User size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#A3A097]" />
+                        <input
+                          className="input !pl-9"
+                          value={forgotId}
+                          onChange={(e) => setForgotId(e.target.value)}
+                          placeholder="如：xiaoming 或 13800138000"
+                          maxLength={20}
+                          autoComplete="username"
+                          data-testid="auth-recover-identifier"
+                        />
+                      </div>
+                    </label>
+                    {forgotError && (
+                      <p className="shake rounded-lg bg-[#FCF1EF] px-3 py-2 text-[12px] text-[#98362E]" role="alert" data-testid="auth-forgot-error">
+                        {forgotError}
+                      </p>
+                    )}
+                    <button type="submit" className="btn btn-primary w-full !py-3" disabled={forgotBusy} data-testid="auth-recover-lookup">
+                      {forgotBusy ? '查询中…' : '查找账户'}
+                      {!forgotBusy && <ArrowRight size={15} />}
+                    </button>
+                  </form>
+                ) : !lookup.recoveryQuestion ? (
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-lg border border-[#E7DFD2] bg-[#FCFBF7] px-3 py-2.5 text-[12px] leading-relaxed" data-testid="auth-recover-hint">
+                      <p>
+                        账户：{lookup.maskedUsername}
+                        {lookup.maskedPhone ? ` · 手机 ${lookup.maskedPhone}` : ''}
+                      </p>
+                    </div>
+                    <p className="rounded-lg bg-[#FCF1EF] px-3 py-2 text-[12px] leading-relaxed text-[#98362E]" role="alert" data-testid="auth-recover-unavailable">
+                      该账户未设置找回问题，无法自助重置密码。请再想想密码；登录后可在「个人设置 → 密码找回」补充问题。
+                    </p>
+                  </div>
+                ) : (
+                  <form className="mt-4 space-y-3.5" onSubmit={(e) => void submitReset(e)}>
+                    <div className="rounded-lg border border-[#E7DFD2] bg-[#FCFBF7] px-3 py-2.5 text-[12px] leading-relaxed" data-testid="auth-recover-hint">
+                      <p>
+                        账户：{lookup.maskedUsername}
+                        {lookup.maskedPhone ? ` · 手机 ${lookup.maskedPhone}` : ''}
+                      </p>
+                      <p className="mt-1 font-medium text-[#3A3D37]" data-testid="auth-recover-question">找回问题：{lookup.recoveryQuestion}</p>
+                    </div>
+                    <label className="block">
+                      <span className="label">找回答案</span>
+                      <div className="relative">
+                        <ShieldCheck size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#A3A097]" />
+                        <input
+                          className="input !pl-9"
+                          value={forgotAnswer}
+                          onChange={(e) => setForgotAnswer(e.target.value)}
+                          placeholder="填写注册时设置的答案"
+                          maxLength={40}
+                          autoComplete="off"
+                          data-testid="auth-recover-answer"
+                        />
+                      </div>
+                    </label>
+                    <label className="block">
+                      <span className="label">新密码</span>
+                      <PasswordInput
+                        value={forgotNewPwd}
+                        onChange={setForgotNewPwd}
+                        placeholder="6–64 个字符"
+                        autoComplete="new-password"
+                        testId="auth-recover-password"
+                        show={forgotShowPwd}
+                        onToggle={() => setForgotShowPwd((v) => !v)}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="label">确认新密码</span>
+                      <div className="relative">
+                        <KeyRound size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#A3A097]" />
+                        <input
+                          className="input !pl-9"
+                          type={forgotShowPwd ? 'text' : 'password'}
+                          value={forgotConfirm}
+                          onChange={(e) => setForgotConfirm(e.target.value)}
+                          placeholder="再输入一次新密码"
+                          maxLength={64}
+                          autoComplete="new-password"
+                          data-testid="auth-recover-confirm"
+                        />
+                      </div>
+                    </label>
+                    {forgotError && (
+                      <p className="shake rounded-lg bg-[#FCF1EF] px-3 py-2 text-[12px] text-[#98362E]" role="alert" data-testid="auth-forgot-error">
+                        {forgotError}
+                      </p>
+                    )}
+                    <button type="submit" className="btn btn-primary w-full !py-3" disabled={forgotBusy} data-testid="auth-recover-submit">
+                      {forgotBusy ? '重置中…' : '重置密码'}
+                      {!forgotBusy && <ArrowRight size={15} />}
+                    </button>
+                  </form>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="mt-3">
+                  {mode === 'register' && (
+                    <button type="button" className="ledger-back" onClick={() => navigate('/login')} data-testid="auth-go-login">
+                      <ArrowLeft size={14} /> 返回登录
+                    </button>
+                  )}
+                  <p className="mt-1 text-[12px] leading-relaxed text-[#6B6A63]">
+                    {mode === 'login' ? '登录你的本地账本；支持用户名或已绑定的手机号。' : '账户与账本只保存在这台设备的浏览器里，注册后需登录进入。'}
+                  </p>
+                  {mode === 'register' && (
+                    <ul className="ledger-note mt-2.5">
+                      <li><CheckCircle2 size={13} className="shrink-0 text-[var(--accent)]" /> 密码与找回答案加盐哈希，仅存本机浏览器</li>
+                      <li><CheckCircle2 size={13} className="shrink-0 text-[var(--accent)]" /> 每个用户独立账本，互不可见</li>
+                      <li><CheckCircle2 size={13} className="shrink-0 text-[var(--accent)]" /> 设置找回问题后，忘记密码可自助重置</li>
+                    </ul>
+                  )}
+                </div>
 
-            {mode === 'login' && (
-              <button
-                type="button"
-                className="btn btn-secondary mt-4 w-full !py-2.5"
-                onClick={() => navigate('/register')}
-                data-testid="auth-go-register"
-              >
-                <UserPlus size={15} /> 没有账户？注册新账户
-              </button>
+                {mode === 'login' && registeredName && (
+                  <p className="fade-in mt-3 flex items-start gap-2 rounded-lg border border-[var(--accent-border)] bg-[var(--accent-soft)] px-3 py-2 text-[12px] leading-relaxed text-[var(--accent-ink)]" data-testid="auth-registered-note">
+                    <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
+                    注册成功！账户「{registeredName}」已创建，请使用用户名或手机号登录。
+                  </p>
+                )}
+
+                <form className="mt-4 space-y-3.5" onSubmit={(e) => void submit(e)}>
+                  <label className="block">
+                    <span className="label">{mode === 'login' ? '用户名或手机号' : '用户名'}</span>
+                    <div className="relative">
+                      <User size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#A3A097]" />
+                      <input
+                        className="input !pl-9"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder={mode === 'login' ? '用户名，或已绑定的手机号' : '2–20 个字符，如：xiaoming'}
+                        maxLength={20}
+                        autoComplete="username"
+                        data-testid="auth-username"
+                      />
+                    </div>
+                  </label>
+                  {mode === 'register' && (
+                    <label className="block fade-in">
+                      <span className="label">手机号（可选）</span>
+                      <div className="relative">
+                        <Smartphone size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#A3A097]" />
+                        <input
+                          className="input !pl-9"
+                          inputMode="tel"
+                          value={phoneInput}
+                          onChange={(e) => setPhoneInput(e.target.value)}
+                          placeholder="11 位手机号，绑定后可用于登录"
+                          maxLength={11}
+                          autoComplete="tel"
+                          data-testid="auth-phone"
+                        />
+                      </div>
+                    </label>
+                  )}
+                  <label className="block">
+                    <span className="label">密码</span>
+                    <PasswordInput
+                      value={password}
+                      onChange={setPassword}
+                      placeholder="至少 6 位，建议字母加数字"
+                      autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                      testId="auth-password"
+                      show={showPassword}
+                      onToggle={() => setShowPassword((v) => !v)}
+                    />
+                  </label>
+                  {mode === 'register' && (
+                    <label className="block fade-in">
+                      <span className="label">确认密码</span>
+                      <div className="relative">
+                        <KeyRound size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#A3A097]" />
+                        <input
+                          className="input !pl-9"
+                          type={showPassword ? 'text' : 'password'}
+                          value={confirm}
+                          onChange={(e) => setConfirm(e.target.value)}
+                          placeholder="再输入一次密码"
+                          maxLength={64}
+                          autoComplete="new-password"
+                          data-testid="auth-confirm"
+                        />
+                      </div>
+                    </label>
+                  )}
+                  {mode === 'register' && (
+                    <div className="fade-in rounded-lg border border-[#E6DFD2] bg-[#FCFBF7] p-3">
+                      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-[#6B6A63]">
+                        <ShieldCheck size={13} className="text-[var(--accent)]" /> 密码找回（必填）
+                      </p>
+                      <div className="space-y-2">
+                        <select
+                          className="select"
+                          value={recoveryQuestion}
+                          onChange={(e) => setRecoveryQuestion(e.target.value)}
+                          data-testid="auth-recovery-question"
+                        >
+                          <option value="">选择找回问题</option>
+                          {RECOVERY_QUESTIONS.map((q) => (
+                            <option key={q} value={q}>{q}</option>
+                          ))}
+                        </select>
+                        <input
+                          className="input"
+                          value={recoveryAnswer}
+                          onChange={(e) => setRecoveryAnswer(e.target.value)}
+                          placeholder="答案（2–40 个字符，忘记密码时用）"
+                          maxLength={40}
+                          autoComplete="off"
+                          data-testid="auth-recovery-answer"
+                        />
+                      </div>
+                      <p className="mt-2 text-[10px] leading-relaxed text-[#8A887F]">答案加盐哈希后仅存本机；手机号可留空，登录后也能在设置中补充。</p>
+                    </div>
+                  )}
+
+                  {mode === 'login' && (
+                    <div className="-mt-1.5 flex justify-end">
+                      <button
+                        type="button"
+                        className="text-[11px] font-medium text-[var(--accent-ink)] underline-offset-2 hover:underline"
+                        onClick={openForgot}
+                        data-testid="auth-forgot"
+                      >
+                        忘记用户名或密码？
+                      </button>
+                    </div>
+                  )}
+
+                  {error && (
+                    <p key={shakeKey} className="shake rounded-lg bg-[#FCF1EF] px-3 py-2 text-[12px] text-[#98362E]" role="alert" data-testid="auth-error">
+                      {error}
+                    </p>
+                  )}
+
+                  <button type="submit" className="btn btn-primary w-full !py-3" disabled={busy} data-testid="auth-submit">
+                    {busy ? '请稍候…' : mode === 'login' ? '登录并进入账本' : '注册账户'}
+                    {!busy && <ArrowRight size={15} />}
+                  </button>
+                </form>
+
+                {mode === 'login' && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary mt-4 w-full !py-2.5"
+                    onClick={() => navigate('/register')}
+                    data-testid="auth-go-register"
+                  >
+                    <UserPlus size={15} /> 没有账户？注册新账户
+                  </button>
+                )}
+              </>
             )}
 
             <div className="mt-4 flex items-start gap-2 border-t border-dashed border-[#E0D8C8] pt-3 text-[10.5px] leading-relaxed text-[#6B6A63]">
               <ShieldCheck size={13} className="mt-0.5 shrink-0 text-[var(--accent)]" />
-              <span>密码加盐哈希后只保存在本机；换电脑或清理浏览器数据前，请先在「数据中心」导出备份。</span>
+              <span>
+                {forgot
+                  ? '找回答案只以加盐哈希保存在本机；重置只影响该账户密码，不会改动账本数据。'
+                  : '密码加盐哈希后只保存在本机；换电脑或清理浏览器数据前，请先在「数据中心」导出备份。'}
+              </span>
             </div>
           </div>
 

@@ -5,15 +5,18 @@ test.describe.configure({ mode: 'serial' });
 let context: BrowserContext;
 let page: Page;
 
-async function loadApp(target: Page, username = 'e2e演示员') {
+async function loadApp(target: Page, username = 'e2e演示员', phone?: string) {
   await target.goto('/');
   await expect(target.getByTestId('auth-page')).toBeVisible();
   await target.getByTestId('auth-go-register').click();
   await expect(target).toHaveURL(/#\/register$/);
   await expect(target.getByTestId('auth-confirm')).toBeVisible();
   await target.getByTestId('auth-username').fill(username);
+  if (phone) await target.getByTestId('auth-phone').fill(phone);
   await target.getByTestId('auth-password').fill('e2e-pass-123');
   await target.getByTestId('auth-confirm').fill('e2e-pass-123');
+  await target.getByTestId('auth-recovery-question').selectOption({ label: '我的第一只宠物叫什么名字？' });
+  await target.getByTestId('auth-recovery-answer').fill('e2e小猫');
   await target.getByTestId('auth-submit').click();
   await expect(target).toHaveURL(/#\/login$/);
   await expect(target.getByTestId('auth-registered-note')).toBeVisible();
@@ -231,6 +234,45 @@ test('个人资料与密码：改名后自动刷新，改密后退回登录页',
   await own.close();
 });
 
+test('手机号登录与忘记密码：绑定手机号、回答问题重置密码', async ({ browser }) => {
+  const own = await browser.newContext();
+  const ownPage = await own.newPage();
+  await loadApp(ownPage, 'e2e安全员', '13900139000');
+
+  await ownPage.goto('/#/settings');
+  await expect(ownPage.getByTestId('settings')).toBeVisible();
+  await expect(ownPage.getByTestId('profile-phone')).toHaveValue('13900139000');
+  await expect(ownPage.getByTestId('recovery-status')).toContainText('我的第一只宠物叫什么名字？');
+
+  await ownPage.getByTestId('account-menu').click();
+  await ownPage.getByTestId('logout').click();
+  await ownPage.getByTestId('auth-username').fill('13900139000');
+  await ownPage.getByTestId('auth-password').fill('e2e-pass-123');
+  await ownPage.getByTestId('auth-submit').click();
+  await expect(ownPage.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
+
+  await ownPage.getByTestId('account-menu').click();
+  await ownPage.getByTestId('logout').click();
+  await ownPage.getByTestId('auth-forgot').click();
+  await ownPage.getByTestId('auth-recover-identifier').fill('13900139000');
+  await ownPage.getByTestId('auth-recover-lookup').click();
+  await expect(ownPage.getByTestId('auth-recover-hint')).toContainText('139****9000');
+  await expect(ownPage.getByTestId('auth-recover-question')).toContainText('我的第一只宠物叫什么名字？');
+  await ownPage.getByTestId('auth-recover-answer').fill('错误答案');
+  await ownPage.getByTestId('auth-recover-password').fill('e2e-pass-789');
+  await ownPage.getByTestId('auth-recover-confirm').fill('e2e-pass-789');
+  await ownPage.getByTestId('auth-recover-submit').click();
+  await expect(ownPage.getByTestId('auth-forgot-error')).toContainText('找回答案不正确');
+  await ownPage.getByTestId('auth-recover-answer').fill('e2e小猫');
+  await ownPage.getByTestId('auth-recover-submit').click();
+  await expect(ownPage.getByTestId('auth-username')).toHaveValue('e2e安全员');
+  await ownPage.getByTestId('auth-password').fill('e2e-pass-789');
+  await ownPage.getByTestId('auth-submit').click();
+  await expect(ownPage.getByTestId('dashboard')).toBeVisible({ timeout: 60_000 });
+  await expect(ownPage.getByTestId('user-chip')).toContainText('e2e安全员');
+  await own.close();
+});
+
 test('清除本机数据后，新注册用户从空账本开始', async () => {
   await page.goto('/#/settings');
   await expect(page.getByTestId('settings')).toBeVisible();
@@ -243,6 +285,8 @@ test('清除本机数据后，新注册用户从空账本开始', async () => {
   await page.getByTestId('auth-username').fill('e2e新用户');
   await page.getByTestId('auth-password').fill('e2e-pass-456');
   await page.getByTestId('auth-confirm').fill('e2e-pass-456');
+  await page.getByTestId('auth-recovery-question').selectOption({ index: 1 });
+  await page.getByTestId('auth-recovery-answer').fill('重置答案');
   await page.getByTestId('auth-submit').click();
   await expect(page.getByTestId('auth-registered-note')).toBeVisible();
   await expect(page.getByTestId('auth-username')).toHaveValue('');
