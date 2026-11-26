@@ -90,9 +90,16 @@ export function parseOptionalPhone(raw) {
   return digits;
 }
 
+export const RECOVERY_QUESTION_MIN_CHARS = 2;
+export const RECOVERY_QUESTION_MAX_CHARS = 40;
+
 export function normalizeRecoveryQuestion(raw) {
-  const question = typeof raw === 'string' ? raw.trim() : '';
-  if (!RECOVERY_QUESTIONS.includes(question)) throw new AppError('invalid_recovery', 400);
+  const question = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
+  const length = codePointLength(question);
+  if (length < RECOVERY_QUESTION_MIN_CHARS || length > RECOVERY_QUESTION_MAX_CHARS) {
+    throw new AppError('invalid_recovery', 400);
+  }
+  if (/[\u0000-\u001f\u007f]/.test(question)) throw new AppError('invalid_recovery', 400);
   return question;
 }
 

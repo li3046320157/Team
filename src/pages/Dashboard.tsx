@@ -28,7 +28,8 @@ import { freeDisposable, goalViews, rangeIncomeExpense, totalBalanceAt, totalRes
 import { buildOccurrenceViews } from '../domain/occurrences';
 import { formatMoneyShort } from '../domain/money';
 import { EChart } from '../components/Chart';
-import { AnimatedMoney, Badge, Button, Card, EmptyState, Money, Progress, Segmented, StatCard, cn } from '../components/ui';
+import { Badge, Button, Card, EmptyState, Money, Progress, Segmented, StatCard, cn } from '../components/ui';
+import { CountUpMoney, Marquee, ScrambleText, ScrollStory } from '../components/TextFx';
 import { gsap, isReducedMotion, useGSAP } from '../motion/gsap';
 import { dueLabel, monthLabel } from '../lib/ui';
 import { cssColor } from '../theme/palette';
@@ -251,6 +252,16 @@ export function DashboardPage() {
 
   const noAccounts = dataset.accounts.length === 0;
   const heroRef = useRef<HTMLElement>(null);
+  const marqueeItems = [
+    `总余额 ${formatMoneyShort(summary.balance)}`,
+    `可用可支配 ${formatMoneyShort(summary.free)}`,
+    `${meta.label}收入 ${formatMoneyShort(periodData.income)}`,
+    `${meta.label}支出 ${formatMoneyShort(periodData.expense)}`,
+    `${meta.label}结余 ${formatMoneyShort(periodData.net)}`,
+    `目标预留 ${formatMoneyShort(summary.reserved)}`,
+    '账本流水只保存在本机浏览器',
+    '整数分记账 · 日 / 月 / 年监测',
+  ];
 
   useGSAP(() => {
     if (!heroRef.current) return;
@@ -270,14 +281,22 @@ export function DashboardPage() {
 
   return (
     <div className="fade-in" data-testid="dashboard">
-      <section ref={heroRef} className="card overflow-hidden" data-reveal="none" aria-labelledby="intro-heading">
+      <section ref={heroRef} className="card hero-card relative overflow-hidden" data-reveal="none" aria-labelledby="intro-heading">
+        <span className="hero-orbit hero-orbit-a" data-parallax="0.1" aria-hidden="true" />
+        <span className="hero-orbit hero-orbit-b" data-parallax="0.2" aria-hidden="true" />
+        <span className="hero-coin-mark" data-parallax="0.28" aria-hidden="true">¥</span>
         <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[1.25fr_0.75fr]">
           <div>
             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10.5px] font-semibold text-[var(--accent-ink)]" data-hero-item>
               <Sparkles size={12} /> 关于金钱流水
             </span>
-            <h1 id="intro-heading" className="mt-3 text-[25px] font-semibold leading-[1.25] tracking-[-0.02em] sm:text-[30px]" data-hero-item>
-              花钱之前，先看清今天、这个月和这一年的现金流。
+            <h1
+              id="intro-heading"
+              className="mt-3 text-[25px] font-semibold leading-[1.25] tracking-[-0.02em] sm:text-[30px]"
+              aria-label="花钱之前，先看清今天、这个月和这一年的现金流。"
+              data-hero-item
+            >
+              <ScrambleText text="花钱之前，先看清今天、这个月和这一年的现金流。" duration={1.05} />
             </h1>
             <p className="mt-3 max-w-2xl text-[13px] leading-relaxed text-[#5F5E57]" data-hero-item>
               金钱流水把真实流水、固定计划与目标预留放进同一本本地账本。总览按日、月、年汇总收入与支出，
@@ -341,6 +360,10 @@ export function DashboardPage() {
         </div>
       </section>
 
+      <div className="mt-4" data-reveal="">
+        <Marquee items={marqueeItems} speed={34} label="账本关键数字滚动摘要" />
+      </div>
+
       <div className="mb-3 mt-6 flex flex-wrap items-end justify-between gap-3" data-reveal="">
         <div>
           <h2 className="text-[20px] font-semibold tracking-[-0.01em]">现金流监测 · 日 / 月 / 年</h2>
@@ -365,28 +388,28 @@ export function DashboardPage() {
       ) : (
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            <StatCard label="总余额" value={<AnimatedMoney id="stat.balance" cents={summary.balance} />} hint={`${dataset.accounts.length} 个账户合计`} tone="accent" />
+            <StatCard label="总余额" value={<CountUpMoney cents={summary.balance} delay={0.05} />} hint={`${dataset.accounts.length} 个账户合计`} tone="accent" />
             <StatCard
               label="可用可支配"
-              value={<AnimatedMoney id="stat.free" cents={summary.free} />}
+              value={<CountUpMoney cents={summary.free} delay={0.14} />}
               hint={`已扣目标预留 ${formatMoneyShort(summary.reserved)} 与安全储备`}
               tone={summary.free < 0 ? 'danger' : 'positive'}
             />
             <StatCard
               label={`${meta.label}收入`}
-              value={<AnimatedMoney id={`stat.income.${period}`} cents={periodData.income} />}
+              value={<CountUpMoney cents={periodData.income} delay={0.23} />}
               hint={`${periodData.incomeCount} 笔收入 · ${periodData.days} 天`}
               tone="accent2"
             />
             <StatCard
               label={`${meta.label}支出`}
-              value={<AnimatedMoney id={`stat.expense.${period}`} cents={periodData.expense} />}
+              value={<CountUpMoney cents={periodData.expense} delay={0.32} />}
               hint={`${periodData.expenseCount} 笔支出 · 日均 ${formatMoneyShort(periodData.avgExpense)}`}
               tone="warning"
             />
             <StatCard
               label={`${meta.label}结余`}
-              value={<AnimatedMoney id={`stat.net.${period}`} cents={periodData.net} />}
+              value={<CountUpMoney cents={periodData.net} delay={0.41} />}
               hint={
                 <span className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-0.5 text-[var(--tone-green)]"><TrendingUp size={12} />{formatMoneyShort(periodData.income)}</span>
@@ -399,6 +422,18 @@ export function DashboardPage() {
           <p className="mt-2 text-[11px] leading-relaxed text-[#8A887F]" data-reveal="">
             统计口径：{meta.caption}实际发生的收入与支出（{periodData.days} 天，{periodData.count} 笔），转账不计入收支；目标预留只影响可支配金额。
           </p>
+
+          <ScrollStory
+            className="scroll-story-home mt-5"
+            kicker="滚动叙事 · 账本的四个动作"
+            title="从一笔流水，到一本看得懂的账"
+            steps={[
+              { label: '记一笔', text: '先把今天真实发生的收支入账，保留每一枚小钱的去向。' },
+              { label: '排计划', text: '房租、订阅等固定收支提前排进账本，到期一键核销。' },
+              { label: '看结构', text: '按日、月、年回看现金流，看清收入与支出如何变化。' },
+              { label: '做预留', text: '先给目标留出资金，再决定这笔大额消费要不要花。' },
+            ]}
+          />
 
           <div className="mt-4 grid gap-4 lg:grid-cols-[1.55fr_1fr]">
             <Card

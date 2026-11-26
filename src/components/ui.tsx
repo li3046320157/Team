@@ -25,6 +25,7 @@ import {
 import { formatMoney, formatMoneyShort } from '../domain/money';
 import { gsap, isReducedMotion, useGSAP } from '../motion/gsap';
 import { useAppStore } from '../store/useAppStore';
+import { ScrambleText } from './TextFx';
 
 export function cn(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(' ');
@@ -91,7 +92,9 @@ export function PageHeader({ title, description, actions }: { title: string; des
   return (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between" data-reveal="">
       <div>
-        <h1 className="page-title text-[26px] font-semibold tracking-[-0.02em] text-[#1F2421]">{title}</h1>
+        <h1 className="page-title text-[26px] font-semibold tracking-[-0.02em] text-[#1F2421]" aria-label={title}>
+          <ScrambleText text={title} />
+        </h1>
         {description && <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-[#6B6A63]">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}

@@ -5,11 +5,15 @@ import { useAppStore } from '../store/useAppStore';
 import { apiLookupRecovery, apiResetPassword } from '../data/account-api';
 import { apiErrorMessage } from '../data/api-core';
 import {
+  CUSTOM_RECOVERY_QUESTION,
   RECOVERY_QUESTIONS,
+  RECOVERY_QUESTION_MAX_CHARS,
   normalizePhone,
+  resolveRecoveryQuestion,
   validateCredentials,
   validateNewPassword,
   validateRecoveryAnswer,
+  validateRecoveryQuestion,
   type AccountLookup,
 } from '../data/auth';
 import { formatCN, todayISO } from '../domain/days';
@@ -17,6 +21,7 @@ import { isReducedMotion } from '../motion/gsap';
 import { AuthIntro } from './AuthIntro';
 import { CoinRain } from './CoinRain';
 import { PalettePicker } from './PalettePicker';
+import { ScrambleText, TypewriterText } from './TextFx';
 import { cn } from './ui';
 
 /** 每次整页加载只播一次；登录 / 注册之间切换不重播。 */
@@ -262,6 +267,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const [confirm, setConfirm] = useState('');
   const [phoneInput, setPhoneInput] = useState('');
   const [recoveryQuestion, setRecoveryQuestion] = useState('');
+  const [customRecoveryQuestion, setCustomRecoveryQuestion] = useState('');
   const [recoveryAnswer, setRecoveryAnswer] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -290,6 +296,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     setConfirm('');
     setPhoneInput('');
     setRecoveryQuestion('');
+    setCustomRecoveryQuestion('');
     setRecoveryAnswer('');
     setError(null);
     setShowPassword(false);
@@ -332,7 +339,13 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         return;
       }
       if (!recoveryQuestion) {
-        fail('请选择找回问题');
+        fail('请选择或填写找回问题');
+        return;
+      }
+      const question = resolveRecoveryQuestion(recoveryQuestion, customRecoveryQuestion);
+      const questionError = validateRecoveryQuestion(question);
+      if (questionError) {
+        fail(questionError);
         return;
       }
       const answerError = validateRecoveryAnswer(recoveryAnswer);
@@ -349,7 +362,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     } else {
       const failure = await register(username, password, {
         phone: phoneInput,
-        question: recoveryQuestion,
+        question: resolveRecoveryQuestion(recoveryQuestion, customRecoveryQuestion),
         answer: recoveryAnswer,
       });
       setBusy(false);
@@ -467,8 +480,14 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           </div>
           <CoinStage />
           <div className="auth-hero-copy">
-            <p className="auth-hero-kicker">顺手记一笔 · 日月年都看得清</p>
-            <h1 className="auth-hero-title">把每一枚小钱，<br />都记进同一本账。</h1>
+            <p className="auth-hero-kicker">
+              <TypewriterText text="顺手记一笔 · 日月年都看得清" speed={44} delay={0.1} />
+            </p>
+            <h1 className="auth-hero-title" aria-label="把每一枚小钱，都记进同一本账。">
+              <TypewriterText text="把每一枚小钱，" speed={88} delay={0.3} caret={false} />
+              <br />
+              <TypewriterText text="都记进同一本账。" speed={88} delay={1.05} />
+            </h1>
             <p className="auth-hero-sub">金币雨会随鼠标方向飘落，点击小金币会闪亮消失；登录账户由云端安全服务托管，账本与流水仍只保存在本机浏览器。</p>
             <div className="auth-hero-chips" aria-hidden="true">
               <span className="is-accent">日 · 月 · 年监测</span>
@@ -483,7 +502,9 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             <span className="ledger-seal" aria-hidden="true">账</span>
             <header className="ledger-head">
               <p className="ledger-kicker">金钱流水 · 私人账本</p>
-              <h2 className="ledger-title">{forgot ? '找回密码' : mode === 'login' ? '欢迎回来' : '创建账户'}</h2>
+              <h2 className="ledger-title" aria-label={forgot ? '找回密码' : mode === 'login' ? '欢迎回来' : '创建账户'}>
+                <ScrambleText text={forgot ? '找回密码' : mode === 'login' ? '欢迎回来' : '创建账户'} delay={0.2} duration={0.7} />
+              </h2>
               <p className="ledger-date">{formatCN(todayISO())} · {forgot ? '核对身份' : mode === 'login' ? '对账入账' : '开立新户'}</p>
             </header>
             <div className="ledger-rule" aria-hidden="true" />
@@ -709,7 +730,19 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                           {RECOVERY_QUESTIONS.map((q) => (
                             <option key={q} value={q}>{q}</option>
                           ))}
+                          <option value={CUSTOM_RECOVERY_QUESTION}>自定义问题…</option>
                         </select>
+                        {recoveryQuestion === CUSTOM_RECOVERY_QUESTION && (
+                          <input
+                            className="input fade-in"
+                            value={customRecoveryQuestion}
+                            onChange={(e) => setCustomRecoveryQuestion(e.target.value)}
+                            placeholder="输入你自己的问题（2–40 个字符）"
+                            maxLength={RECOVERY_QUESTION_MAX_CHARS}
+                            autoComplete="off"
+                            data-testid="auth-recovery-custom"
+                          />
+                        )}
                         <input
                           className="input"
                           value={recoveryAnswer}
@@ -720,7 +753,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                           data-testid="auth-recovery-answer"
                         />
                       </div>
-                      <p className="mt-2 text-[10px] leading-relaxed text-[#8A887F]">答案加盐哈希后保存在账户服务；手机号可留空，登录后也能在设置中补充。</p>
+                      <p className="mt-2 text-[10px] leading-relaxed text-[#8A887F]">问题与答案加盐哈希后保存在账户服务；手机号可留空，登录后也能在设置中补充。</p>
                     </div>
                   )}
 

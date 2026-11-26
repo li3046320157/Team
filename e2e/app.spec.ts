@@ -18,7 +18,12 @@ async function skipAuthIntro(target: Page) {
   await expect(intro).toBeHidden();
 }
 
-async function loadApp(target: Page, username = 'e2e演示员', phone?: string) {
+async function loadApp(
+  target: Page,
+  username = 'e2e演示员',
+  phone?: string,
+  recovery?: { question: string; answer: string },
+) {
   await target.goto('/');
   await expect(target.getByTestId('auth-page')).toBeVisible();
   await skipAuthIntro(target);
@@ -29,8 +34,14 @@ async function loadApp(target: Page, username = 'e2e演示员', phone?: string) 
   if (phone) await target.getByTestId('auth-phone').fill(phone);
   await target.getByTestId('auth-password').fill('e2e-pass-123');
   await target.getByTestId('auth-confirm').fill('e2e-pass-123');
-  await target.getByTestId('auth-recovery-question').selectOption({ label: '我的第一只宠物叫什么名字？' });
-  await target.getByTestId('auth-recovery-answer').fill('e2e小猫');
+  if (recovery) {
+    await target.getByTestId('auth-recovery-question').selectOption({ label: '自定义问题…' });
+    await target.getByTestId('auth-recovery-custom').fill(recovery.question);
+    await target.getByTestId('auth-recovery-answer').fill(recovery.answer);
+  } else {
+    await target.getByTestId('auth-recovery-question').selectOption({ label: '我的第一只宠物叫什么名字？' });
+    await target.getByTestId('auth-recovery-answer').fill('e2e小猫');
+  }
   await target.getByTestId('auth-submit').click();
   await expect(target).toHaveURL(/#\/login$/);
   await expect(target.getByTestId('auth-registered-note')).toBeVisible();
@@ -71,22 +82,22 @@ test('总览首屏说明系统目的与全部功能，并显示日/月/年现金
   await expect(page.getByRole('heading', { name: /花钱之前/ })).toBeVisible();
   await expect(page.getByText('全部功能 · 每个模块解决什么问题')).toBeVisible();
   await expect(page.getByRole('heading', { name: '现金流监测 · 日 / 月 / 年' })).toBeVisible();
-  await expect(page.getByText('本月结余')).toBeVisible();
+  await expect(page.getByText('本月结余', { exact: true })).toBeVisible();
   await expect(page.getByTestId('quick-add')).toBeVisible();
 });
 
 test('总览：切换日、月、年现金流视图', async () => {
   await page.getByRole('button', { name: '日', exact: true }).click();
-  await expect(page.getByText('今日结余')).toBeVisible();
+  await expect(page.getByText('今日结余', { exact: true })).toBeVisible();
   await expect(page.getByText('近 14 天收支趋势')).toBeVisible();
   await page.getByRole('button', { name: '年', exact: true }).click();
-  await expect(page.getByText('今年结余')).toBeVisible();
+  await expect(page.getByText('今年结余', { exact: true })).toBeVisible();
   await expect(page.getByText('近 5 年收支趋势')).toBeVisible();
   await page.getByRole('button', { name: '月', exact: true }).click();
-  await expect(page.getByText('本月结余')).toBeVisible();
+  await expect(page.getByText('本月结余', { exact: true })).toBeVisible();
 });
 
-test('账本：右侧索引翻页、页码与上下翻页按钮', async () => {
+test('账本：底部栏目索引、左右翻页按钮与页码', async () => {
   await expect(page.getByTestId('book-tab-home')).toBeVisible();
   await page.getByTestId('book-tab-ledger').click();
   await expect(page.getByTestId('ledger')).toBeVisible();
@@ -100,7 +111,7 @@ test('账本：右侧索引翻页、页码与上下翻页按钮', async () => {
   await expect(page.locator('.book-leaf')).toHaveCount(1);
 });
 
-test('账本：滚到底后继续下滑、PageUp/PageDown 均可翻页', async () => {
+test('账本：滚到底继续下滑、横向滚轮、PageUp/PageDown 均可翻页', async () => {
   await expect(page.getByTestId('ledger')).toBeVisible();
   await expect(page.locator('.book-leaf')).toHaveCount(1);
   const scroll = page.locator('[data-book-scroll]').first();
@@ -119,6 +130,10 @@ test('账本：滚到底后继续下滑、PageUp/PageDown 均可翻页', async (
   await expect(page.locator('.book-leaf')).toHaveCount(1);
   await page.keyboard.press('PageUp');
   await expect(page.getByTestId('ledger')).toBeVisible();
+  await expect(page.locator('.book-leaf')).toHaveCount(1);
+  await page.mouse.wheel(500, 0);
+  await expect(page.getByTestId('schedules')).toBeVisible();
+  await expect(page.getByTestId('book-page-chip')).toContainText('03');
   await expect(page.locator('.book-leaf')).toHaveCount(1);
 });
 
@@ -306,6 +321,15 @@ test('手机号登录与忘记密码：绑定手机号、回答问题重置密�
   await expect(ownPage.getByTestId('profile-phone')).toHaveValue('13900139000');
   await expect(ownPage.getByTestId('recovery-status')).toContainText('我的第一只宠物叫什么名字？');
 
+  const customQuestion = '我小时候养的金鱼叫什么名字？';
+  await ownPage.getByTestId('recovery-question').selectOption({ label: '自定义问题…' });
+  await ownPage.getByTestId('recovery-custom-question').fill(customQuestion);
+  await ownPage.getByTestId('recovery-current-password').fill('e2e-pass-123');
+  await ownPage.getByTestId('recovery-answer').fill('e2e金鱼');
+  await ownPage.getByTestId('save-recovery').click();
+  await expect(ownPage.getByRole('status')).toContainText('找回问题已保存');
+  await expect(ownPage.getByTestId('recovery-status')).toContainText(customQuestion);
+
   await ownPage.getByTestId('account-menu').click();
   await ownPage.getByTestId('logout').click();
   await ownPage.getByTestId('auth-username').fill('13900139000');
@@ -320,13 +344,13 @@ test('手机号登录与忘记密码：绑定手机号、回答问题重置密�
   await ownPage.getByTestId('auth-recover-identifier').fill('13900139000');
   await ownPage.getByTestId('auth-recover-lookup').click();
   await expect(ownPage.getByTestId('auth-recover-hint')).toContainText('139****9000');
-  await expect(ownPage.getByTestId('auth-recover-question')).toContainText('我的第一只宠物叫什么名字？');
+  await expect(ownPage.getByTestId('auth-recover-question')).toContainText(customQuestion);
   await ownPage.getByTestId('auth-recover-answer').fill('错误答案');
   await ownPage.getByTestId('auth-recover-password').fill('e2e-pass-789');
   await ownPage.getByTestId('auth-recover-confirm').fill('e2e-pass-789');
   await ownPage.getByTestId('auth-recover-submit').click();
   await expect(ownPage.getByTestId('auth-forgot-error')).toContainText('找回答案不正确');
-  await ownPage.getByTestId('auth-recover-answer').fill('e2e小猫');
+  await ownPage.getByTestId('auth-recover-answer').fill('e2e金鱼');
   await ownPage.getByTestId('auth-recover-submit').click();
   await expect(ownPage.getByTestId('auth-username')).toHaveValue('e2e安全员');
   await ownPage.getByTestId('auth-password').fill('e2e-pass-789');
@@ -408,7 +432,12 @@ test('移动端：账本翻页栏与目录抽屉可进入计划页', async ({ br
     locale: 'zh-CN',
   });
   const mp = await mobile.newPage();
-  await loadApp(mp, 'e2e移动端');
+  await loadApp(mp, 'e2e移动端', undefined, {
+    question: '我最喜欢的一本书是什么？',
+    answer: 'e2e账本',
+  });
+  await mp.goto('/#/settings');
+  await expect(mp.getByTestId('recovery-status')).toContainText('我最喜欢的一本书是什么？');
   await expect(mp.getByRole('navigation', { name: '账本翻页' })).toBeVisible();
   await mp.getByTestId('book-toc').click();
   await expect(mp.getByRole('dialog', { name: '账本目录' })).toBeVisible();

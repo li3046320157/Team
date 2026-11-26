@@ -414,6 +414,53 @@ test('云端账户与管理员契约', async (t) => {
     assert.equal(login.status, 200);
   });
 
+  await t.test('自定义找回问题可注册、找回并校验长度', async () => {
+    const question = '我小时候养的金鱼叫什么名字？';
+    const registered = await call(app, '/api/register', {
+      method: 'POST',
+      body: {
+        username: 'bob',
+        password: 'bob12345',
+        recovery: { question: `  ${question}  `, answer: '泡泡' },
+      },
+    });
+    assert.equal(registered.status, 201);
+    assert.equal((await jsonOf(registered)).user.recoveryQuestion, question);
+
+    const found = await call(app, '/api/recovery/lookup', {
+      method: 'POST',
+      body: { identifier: 'bob' },
+    });
+    assert.equal(found.status, 200);
+    const foundPayload = await jsonOf(found);
+    assert.equal(foundPayload.found, true);
+    assert.equal(foundPayload.account.recoveryQuestion, question);
+
+    const reset = await call(app, '/api/recovery/reset', {
+      method: 'POST',
+      body: { identifier: 'bob', answer: '泡泡', newPassword: 'bob45678' },
+    });
+    assert.equal(reset.status, 200);
+
+    const login = await call(app, '/api/login', {
+      method: 'POST',
+      body: { identifier: 'bob', password: 'bob45678' },
+    });
+    assert.equal(login.status, 200);
+    const bobCookie = cookieOf(login);
+
+    const tooShort = await call(app, '/api/account/recovery', {
+      method: 'POST',
+      cookie: bobCookie,
+      body: {
+        currentPassword: 'bob45678',
+        recovery: { question: '问', answer: '泡泡' },
+      },
+    });
+    assert.equal(tooShort.status, 400);
+    assert.equal((await jsonOf(tooShort)).error, 'invalid_recovery');
+  });
+
   await t.test('固定窗口限流按窗口放行与拦截', async () => {
     const now = Date.now();
     for (let index = 0; index < 10; index += 1) {
