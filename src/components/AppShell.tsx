@@ -22,6 +22,7 @@ import { useAppStore } from '../store/useAppStore';
 import { ScrollTrigger } from '../motion/gsap';
 import { ScrollProgress } from '../motion/ScrollProgress';
 import { usePageReveal } from '../motion/usePageReveal';
+import { PageAtmosphere } from './PageAtmosphere';
 import { cn } from './ui';
 
 const NAV = [
@@ -45,8 +46,8 @@ function Brand() {
     <div className="flex items-center gap-2.5">
       <div className="brand-mark grid h-9 w-9 place-items-center rounded-[11px] text-[17px] font-bold text-white">¥</div>
       <div>
-        <p className="text-[15px] font-semibold leading-none tracking-tight">MoneyFlow</p>
-        <p className="mt-1 text-[10.5px] font-medium tracking-[0.16em] text-[#8A887F]">钱流 · 本地账本</p>
+        <p className="text-[15px] font-semibold leading-none tracking-tight">金钱流水</p>
+        <p className="mt-1 text-[10.5px] font-medium tracking-[0.16em] text-[#8A887F]">日 · 月 · 年 · 本地账本</p>
       </div>
     </div>
   );
@@ -59,7 +60,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
-  const activeLabel = NAV.find((n) => n.to === location.pathname)?.label ?? 'MoneyFlow';
+  const activeLabel = NAV.find((n) => n.to === location.pathname)?.label ?? '金钱流水';
   const pageRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
 
@@ -132,6 +133,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
 
         <main className="mx-auto w-full max-w-[1180px] px-4 pb-28 pt-5 sm:px-6 lg:pb-12 lg:pt-8">
+          <PageAtmosphere />
           <div ref={pageRef} key={location.pathname} className="page-motion">{children}</div>
         </main>
       </div>

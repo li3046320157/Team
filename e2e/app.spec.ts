@@ -38,12 +38,24 @@ test.afterAll(async () => {
   await context.close();
 });
 
-test('总览首屏说明系统目的与全部功能，并显示现金流摘要', async () => {
+test('总览首屏说明系统目的与全部功能，并显示日/月/年现金流摘要', async () => {
   await expect(page.getByTestId('dashboard')).toBeVisible();
   await expect(page.getByRole('heading', { name: /花钱之前/ })).toBeVisible();
   await expect(page.getByText('全部功能 · 每个模块解决什么问题')).toBeVisible();
-  await expect(page.getByText('未来 30 天余额')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '现金流监测 · 日 / 月 / 年' })).toBeVisible();
+  await expect(page.getByText('本月结余')).toBeVisible();
   await expect(page.getByTestId('quick-add')).toBeVisible();
+});
+
+test('总览：切换日、月、年现金流视图', async () => {
+  await page.getByRole('button', { name: '日', exact: true }).click();
+  await expect(page.getByText('今日结余')).toBeVisible();
+  await expect(page.getByText('近 14 天收支趋势')).toBeVisible();
+  await page.getByRole('button', { name: '年', exact: true }).click();
+  await expect(page.getByText('今年结余')).toBeVisible();
+  await expect(page.getByText('近 5 年收支趋势')).toBeVisible();
+  await page.getByRole('button', { name: '月', exact: true }).click();
+  await expect(page.getByText('本月结余')).toBeVisible();
 });
 
 test('一句话快速记账：解析、确认并写入流水', async () => {
