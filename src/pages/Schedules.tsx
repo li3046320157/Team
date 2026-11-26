@@ -154,7 +154,7 @@ function FlowForm({
               <option value="week">每周</option>
               <option value="month">每月</option>
               <option value="year">每年</option>
-              <option value="day">每天 / 一次性</option>
+              <option value="day">每日 / 一次性</option>
             </select>
           </Field>
           <Field label="每隔几次" hint="月/年重复会按原始日号自动处理月底，如 31 日在 2 月截断。">
