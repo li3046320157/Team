@@ -1682,21 +1682,21 @@ table.data tbody tr:hover {
   content: '';
   position: absolute;
   inset: -16%;
-  opacity: 0.5;
-  -webkit-mask-image: radial-gradient(ellipse at 74% 16%, #000 0 24%, transparent 70%);
-  mask-image: radial-gradient(ellipse at 74% 16%, #000 0 24%, transparent 70%);
+  opacity: 0.7;
+  -webkit-mask-image: radial-gradient(ellipse at 74% 16%, #000 0 30%, transparent 72%);
+  mask-image: radial-gradient(ellipse at 74% 16%, #000 0 30%, transparent 72%);
 }
 .page-atmosphere::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at 50% 34%, transparent 30%, rgba(247, 245, 241, 0.55) 92%);
+  background: radial-gradient(ellipse at 50% 34%, transparent 32%, rgba(247, 245, 241, 0.42) 94%);
 }
 .atmo-orb {
   position: absolute;
   border-radius: 50%;
   filter: blur(80px);
-  opacity: 0.15;
+  opacity: 0.24;
 }
 .atmo-orb-a {
   width: 38vw;
@@ -1738,8 +1738,8 @@ table.data tbody tr:hover {
   position: absolute;
   right: -28px;
   top: 44px;
-  color: color-mix(in srgb, var(--atmo-hue) 26%, transparent);
-  opacity: 0.32;
+  color: color-mix(in srgb, var(--atmo-hue) 32%, transparent);
+  opacity: 0.46;
   animation: atmoMark calc(24s * var(--site-motion, 1)) ease-in-out infinite alternate;
 }
 .atmo-mark svg {
@@ -1758,7 +1758,7 @@ table.data tbody tr:hover {
   font-family: var(--font-ledger);
   font-weight: 600;
   color: color-mix(in srgb, var(--atmo-hue) 62%, transparent);
-  opacity: 0.17;
+  opacity: 0.28;
   user-select: none;
   animation: atmoFloat calc(17s * var(--site-motion, 1)) ease-in-out infinite alternate;
 }
@@ -1814,8 +1814,8 @@ table.data tbody tr:hover {
   left: -40%;
   width: 34%;
   height: 160%;
-  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--atmo-hue) 8%, transparent) 45%, transparent 72%);
-  opacity: 0.6;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--atmo-hue) 11%, transparent) 45%, transparent 72%);
+  opacity: 0.8;
   animation: atmoSweep calc(19s * var(--site-motion, 1)) linear infinite;
 }
 @keyframes atmoSweep {
