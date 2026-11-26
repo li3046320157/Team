@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react';
-import { CalendarRange, Check, HelpCircle, Info, KeyRound, Landmark, Palette, Plus, Save, Settings2, ShieldCheck, Smartphone, Sparkles, Trash2, UserRound } from 'lucide-react';
+import { CalendarRange, Check, HelpCircle, Info, KeyRound, Landmark, Palette, Plus, Save, Settings2, ShieldCheck, Smartphone, Sparkles, Trash2, UserRound, UserX } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import {
   CUSTOM_RECOVERY_QUESTION,
@@ -41,6 +41,7 @@ export function SettingsPage() {
   const bindPhone = useAppStore((s) => s.bindPhone);
   const changePassword = useAppStore((s) => s.changePassword);
   const updateRecovery = useAppStore((s) => s.updateRecovery);
+  const deleteAccountAction = useAppStore((s) => s.deleteAccount);
   const logout = useAppStore((s) => s.logout);
   const today = todayISO();
   const s = dataset.settings;
@@ -76,6 +77,13 @@ export function SettingsPage() {
   const [accError, setAccError] = useState<string | null>(null);
   const [wipeOpen, setWipeOpen] = useState(false);
   const [wiping, setWiping] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
+  const [deleteAck, setDeleteAck] = useState(false);
+  const [deleteName, setDeleteName] = useState('');
+  const [deletePwd, setDeletePwd] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [profileName, setProfileName] = useState(user?.username ?? '');
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -203,6 +211,33 @@ export function SettingsPage() {
       setError('清除失败，请检查浏览器存储权限');
       setWipeOpen(false);
     }
+  };
+
+  const openDeleteAccount = () => {
+    setDeleteStep(1);
+    setDeleteAck(false);
+    setDeleteName('');
+    setDeletePwd('');
+    setDeleteError(null);
+    setDeleteOpen(true);
+  };
+
+  const closeDeleteAccount = () => {
+    if (deleting) return;
+    setDeleteOpen(false);
+  };
+
+  const submitDeleteAccount = async () => {
+    setDeleteError(null);
+    const username = user?.username ?? '';
+    if (deleteName.trim() !== username) return setDeleteError(`请输入当前用户名「${username}」以确认`);
+    if (!deletePwd) return setDeleteError('请输入当前密码以验证身份');
+    setDeleting(true);
+    const message = await deleteAccountAction(deletePwd, deleteName.trim());
+    setDeleting(false);
+    if (message) return setDeleteError(message);
+    setDeleteOpen(false);
+    window.location.hash = '#/';
   };
 
   const saveProfile = async () => {
@@ -565,7 +600,19 @@ export function SettingsPage() {
           </Button>
         </Card>
 
-        <Card className="rise" style={{ '--i': 9 } as CSSProperties} title="关于与数据原则" subtitle="金钱流水 · 本地优先的个人现金流工作台" action={<Settings2 size={15} className="text-[#8A887F]" />}>
+        <Card className="rise" style={{ '--i': 9 } as CSSProperties} title="注销账号" subtitle="永久删除云端账户，并销毁该账户在本机的全部数据" action={<UserX size={15} className="text-[#98362E]" />}>
+          <ul className="space-y-1.5 text-[11.5px] leading-relaxed text-[#6B6A63]">
+            <li>· 云端账户：用户名、手机号、找回问题、登录与使用记录会从账户服务中删除，管理员后台同步移除该用户。</li>
+            <li>· 本机数据：该账户专属的账本、目标、预测快照与 AI 接口配置全部销毁，其他账户与本机偏好不受影响。</li>
+            <li>· 用户名与手机号会释放，但原账本与云端记录均无法恢复，管理员也无法找回。</li>
+          </ul>
+          <Button variant="danger" size="sm" className="mt-3" onClick={openDeleteAccount} data-testid="delete-account">
+            <UserX size={13} /> 注销账号
+          </Button>
+          <InfoNote tone="warn">这是不可撤销的危险操作；如果只是暂时不想使用，请直接退出登录。注销前建议先到「数据中心」导出备份。</InfoNote>
+        </Card>
+
+        <Card className="rise" style={{ '--i': 10 } as CSSProperties} title="关于与数据原则" subtitle="金钱流水 · 本地优先的个人现金流工作台" action={<Settings2 size={15} className="text-[#8A887F]" />}>
           <ul className="space-y-2 text-[11.5px] leading-relaxed text-[#6B6A63]">
             <li>版本 1.0.0 · 数据格式 v1 · 设置版本 v{s.settingsVersion}</li>
             <li>账户资料、手机号与登录记录保存在云端账户服务；账本流水、备份与 AI 配置保存在浏览器，不上传。</li>
@@ -637,6 +684,70 @@ export function SettingsPage() {
         <p className="text-[12px] leading-relaxed text-[#6B6A63]">
           清除后会重新进入空账本，需要重新完成引导；云端账户不会被删除。如果还需要这些数据，请先取消并到「数据中心」导出 JSON 备份。
         </p>
+      </Modal>
+
+      <Modal
+        open={deleteOpen}
+        title="注销账号"
+        subtitle={deleteStep === 1 ? '第 1 步 / 共 2 步 · 了解注销后果' : '第 2 步 / 共 2 步 · 验证身份并永久注销'}
+        onClose={closeDeleteAccount}
+        footer={deleteStep === 1 ? (
+          <>
+            <Button variant="secondary" onClick={closeDeleteAccount} disabled={deleting}>取消</Button>
+            <Button variant="danger" onClick={() => setDeleteStep(2)} disabled={!deleteAck} data-testid="delete-account-next">继续确认</Button>
+          </>
+        ) : (
+          <>
+            <Button variant="secondary" onClick={() => { setDeleteStep(1); setDeleteError(null); }} disabled={deleting}>返回</Button>
+            <Button variant="danger" onClick={() => void submitDeleteAccount()} disabled={deleting || !deleteName.trim() || !deletePwd} data-testid="confirm-delete-account">
+              {deleting ? '正在注销…' : '永久注销账号'}
+            </Button>
+          </>
+        )}
+      >
+        {deleteStep === 1 ? (
+          <div className="space-y-3">
+            <div className="rounded-lg border border-[#F3D9B5] bg-[#FDF6EA] px-3 py-2.5 text-[11.5px] leading-relaxed text-[#8A5A12]">
+              注销会立即撤销所有设备的登录状态，删除云端账户资料与管理员后台记录，并销毁本浏览器中该账户的账本与 AI 配置。已导出或另行保存的备份文件不受影响。
+            </div>
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-[#E4E0D8] bg-[#FCFBF8] px-3 py-2.5">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-[#98362E]"
+                checked={deleteAck}
+                onChange={(e) => setDeleteAck(e.target.checked)}
+                data-testid="delete-account-ack"
+              />
+              <span className="text-[12px] leading-relaxed text-[#3A3D37]">我已了解：注销不可撤销，云端账户、管理员后台记录与本机数据都会被永久销毁。</span>
+            </label>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="rounded-lg border border-[#F3D9B5] bg-[#FDF6EA] px-3 py-2.5 text-[11.5px] leading-relaxed text-[#8A5A12]">
+              最后一步：输入当前用户名与密码。验证通过后账号将立即注销，无法撤销。
+            </p>
+            <Field label={`输入当前用户名「${user?.username ?? ''}」`} hint="必须与当前用户名完全一致。">
+              <input
+                className="input"
+                value={deleteName}
+                autoComplete="username"
+                onChange={(e) => setDeleteName(e.target.value)}
+                data-testid="delete-account-username"
+              />
+            </Field>
+            <Field label="当前密码" hint="用于验证身份，不会保存。">
+              <input
+                className="input"
+                type="password"
+                value={deletePwd}
+                autoComplete="current-password"
+                onChange={(e) => setDeletePwd(e.target.value)}
+                data-testid="delete-account-password"
+              />
+            </Field>
+            {deleteError && <p className="rounded-lg bg-[#FCF1EF] px-3 py-2 text-[12px] text-[#98362E]" role="alert" data-testid="delete-account-error">{deleteError}</p>}
+          </div>
+        )}
       </Modal>
     </div>
   );

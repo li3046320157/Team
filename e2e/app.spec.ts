@@ -372,6 +372,52 @@ test('清除本机账本后，云端账户保留并重新进入空账本', async
   await expect(page.getByTestId('dashboard')).toHaveCount(0);
 });
 
+test('注销账号：两步确认、本机数据销毁且云端账户不可再登录', async ({ browser }) => {
+  const own = await browser.newContext();
+  const ownPage = await own.newPage();
+  await loadApp(ownPage, 'e2e注销员', '13600136000', {
+    question: '我小时候养的金鱼叫什么名字？',
+    answer: 'e2e金鱼',
+  });
+  await ownPage.goto('/#/settings');
+  await expect(ownPage.getByTestId('settings')).toBeVisible();
+
+  const dbNames = () => ownPage.evaluate(async () => {
+    const factory = indexedDB as IDBFactory & { databases?: () => Promise<{ name?: string }[]> };
+    const list = factory.databases ? await factory.databases() : [];
+    return list.map((info) => info.name ?? '').filter(Boolean);
+  });
+  const before = await dbNames();
+  const personalDb = before.find((name) => name.startsWith('moneyflow-user-'));
+  expect(personalDb).toBeTruthy();
+
+  await ownPage.getByTestId('delete-account').click();
+  const dialog = ownPage.getByRole('dialog', { name: '注销账号' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByTestId('delete-account-next')).toBeDisabled();
+  await dialog.getByTestId('delete-account-ack').check();
+  await dialog.getByTestId('delete-account-next').click();
+  await expect(dialog.getByText('第 2 步 / 共 2 步 · 验证身份并永久注销')).toBeVisible();
+
+  await dialog.getByTestId('delete-account-username').fill('e2e注销员');
+  await dialog.getByTestId('delete-account-password').fill('wrong-password');
+  await dialog.getByTestId('confirm-delete-account').click();
+  await expect(dialog.getByTestId('delete-account-error')).toContainText('当前密码不正确');
+
+  await dialog.getByTestId('delete-account-password').fill('e2e-pass-123');
+  await dialog.getByTestId('confirm-delete-account').click();
+  await expect(ownPage.getByTestId('auth-page')).toBeVisible({ timeout: 20_000 });
+
+  await ownPage.getByTestId('auth-username').fill('e2e注销员');
+  await ownPage.getByTestId('auth-password').fill('e2e-pass-123');
+  await ownPage.getByTestId('auth-submit').click();
+  await expect(ownPage.getByTestId('auth-error')).toContainText('用户名或密码不正确');
+
+  const after = await dbNames();
+  expect(after).not.toContain(personalDb);
+  await own.close();
+});
+
 test('管理员：首登强制改密、用户管理与独立控制台', async ({ browser }) => {
   const adminContext = await browser.newContext();
   const adminPage = await adminContext.newPage();
@@ -395,6 +441,7 @@ test('管理员：首登强制改密、用户管理与独立控制台', async ({
 
   await adminPage.getByRole('navigation', { name: '管理员导航', exact: true }).getByTestId('admin-nav-users').click();
   await expect(adminPage.getByTestId('admin-users')).toBeVisible();
+  await expect(adminPage.getByTestId('admin-user-row').filter({ hasText: 'e2e注销员' })).toHaveCount(0);
   const row = adminPage.getByTestId('admin-user-row').filter({ hasText: 'e2e演示员' }).first();
   await expect(row).toBeVisible();
   await row.click();

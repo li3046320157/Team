@@ -1,5 +1,6 @@
 /** 本机数据清理：删除账本、偏好与旧版本地账户；云端账户不受影响。 */
 import { closeAllDbs } from './db';
+import { personalDbNameFor } from './auth';
 
 const CLEAN_SLATE_KEY = 'moneyflow.cleanSlate.v1';
 const LEGACY_SESSION_KEY = 'moneyflow.session';
@@ -39,6 +40,17 @@ export async function wipeAllLocalData(): Promise<void> {
     /* 隐私模式下忽略存储清理失败 */
   }
   await Promise.all([...names].map(deleteDatabase));
+}
+
+/** 注销账户后销毁该账户在本机的专属账本与 AI 配置；设备级配色与动效偏好不受影响。 */
+export async function destroyUserLocalData(userId: string): Promise<void> {
+  closeAllDbs();
+  try {
+    localStorage.removeItem(`moneyflow.ai.${userId}`);
+  } catch {
+    /* 隐私模式下忽略存储清理失败 */
+  }
+  await deleteDatabase(personalDbNameFor(userId));
 }
 
 let legacyRetired: Promise<void> | null = null;

@@ -439,6 +439,85 @@ export async function updateRecovery(db, request) {
   return json({ user: toPublicUser(updated.data[0]) });
 }
 
+async function eraseRows(db, table, column, value) {
+  try {
+    await db.from(table).delete().eq(column, value);
+  } catch {
+    // 单表清理失败不阻断账户主体删除；用户行删除后残留行也无法再关联登录。
+  }
+}
+
+function accountLimiterKeys(user) {
+  const lower = user.username_lower;
+  const keys = [
+    `register:${lower}`,
+    `login:user:${lower}`,
+    `usage:${user.id}`,
+    `delete_account:${user.id}`,
+    `recovery:lookup:user:${lower}`,
+    `recovery:reset:user:${lower}`,
+  ];
+  if (user.phone) {
+    keys.push(`login:phone:${user.phone}`);
+    keys.push(`recovery:lookup:phone:${user.phone}`);
+    keys.push(`recovery:reset:phone:${user.phone}`);
+  }
+  return keys;
+}
+
+export async function deleteAccount(db, request) {
+  const { user } = await requireUser(db, request);
+  requireNormalUser(user);
+  const body = await readJson(request);
+  const currentPassword = boundedPassword(body?.currentPassword);
+  const confirmation = typeof body?.confirmUsername === 'string' ? body.confirmUsername.trim() : '';
+
+  const limit = await consume(db, 'delete_account', user.id);
+  if (!limit.allowed) return errorJson('rate_limited', 429, retryAfter(limit));
+  if (!currentPassword) return errorJson('current_password_incorrect', 400);
+  if (!confirmation || confirmation !== user.username) return errorJson('confirmation_mismatch', 400);
+
+  const full = await loadUserFullById(db, user.id);
+  if (!full) throw new SessionRequired('invalid');
+  const valid = await verifyPassword(currentPassword, {
+    salt: full.password_salt,
+    hash: full.password_hash,
+    iterations: full.password_iterations,
+  });
+  if (!valid) return errorJson('current_password_incorrect', 400);
+
+  try {
+    await revokeAllSessions(db, user.id);
+  } catch {
+    // 即使撤销失败，随后删除会话行与用户行也会让旧会话失效。
+  }
+  await eraseRows(db, 'sessions', 'user_id', user.id);
+  await eraseRows(db, 'usage_daily', 'user_id', user.id);
+  await eraseRows(db, 'auth_events', 'user_id', user.id);
+  await eraseRows(db, 'auth_events', 'actor_id', user.id);
+  for (const key of accountLimiterKeys(user)) {
+    await eraseRows(db, 'auth_limiter', 'key', key);
+  }
+
+  let deleted;
+  try {
+    deleted = await db.from('users').delete().eq('id', user.id).eq('role', 'user');
+  } catch {
+    return errorJson('delete_unconfirmed', 503);
+  }
+  if (deleted?.error) return errorJson('delete_unconfirmed', 503);
+
+  let remaining;
+  try {
+    remaining = rows(await db.from('users').select('id').eq('id', user.id).limit(1));
+  } catch {
+    return errorJson('delete_unconfirmed', 503);
+  }
+  if (remaining.length !== 0) return errorJson('delete_unconfirmed', 503);
+
+  return json({ ok: true }, 200, { 'set-cookie': clearSessionCookie() });
+}
+
 export async function lookupRecovery(db, request) {
   const body = await readJson(request);
   const identifier = parseLoginIdentifier(body?.identifier);

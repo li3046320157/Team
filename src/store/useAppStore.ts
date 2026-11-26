@@ -6,6 +6,7 @@ import { clearDataset, describeDbError, readDataset, writeDataset, setPersonalDb
 import {
   apiBindPhone,
   apiChangePassword,
+  apiDeleteAccount,
   apiLogin,
   apiLogout,
   apiMe,
@@ -16,7 +17,7 @@ import {
 import { ApiError, apiErrorMessage, setSessionExpiredHandler } from '../data/api-core';
 import { personalDbNameFor, type AuthUser, type RegistrationDetails } from '../data/auth';
 import { createEmptyDataset } from '../data/defaults';
-import { applyCleanSlateOnce, retireLegacyLocalAuth } from '../data/wipe';
+import { applyCleanSlateOnce, destroyUserLocalData, retireLegacyLocalAuth } from '../data/wipe';
 import { addAccount, applyOnboarding, type AccountInput } from '../services/mutations';
 import { runCalibrationOnDataset, saveDailySnapshot, saveManualSnapshot, type CalibrationOutcome } from '../services/snapshots';
 
@@ -46,6 +47,7 @@ interface AppState {
   bindPhone: (phone: string) => Promise<string | null>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<string | null>;
   updateRecovery: (currentPassword: string, question: string, answer: string) => Promise<string | null>;
+  deleteAccount: (currentPassword: string, confirmUsername: string) => Promise<string | null>;
   applyUser: (user: AuthUser) => void;
   logout: () => Promise<string | null>;
   init: () => Promise<void>;
@@ -77,11 +79,17 @@ let toastTimer: ReturnType<typeof setTimeout> | null = null;
 function setupChannel(): void {
   if (channel || typeof BroadcastChannel === 'undefined') return;
   channel = new BroadcastChannel(CHANNEL_NAME);
-  channel.onmessage = (event: MessageEvent<{ mode?: DataMode; source?: string; uid?: string | null }>) => {
+  channel.onmessage = (event: MessageEvent<{ mode?: DataMode; source?: string; uid?: string | null; deleted?: boolean }>) => {
     const data = event.data;
     if (!data || data.source === TAB_ID) return;
     const state = useAppStore.getState();
     if ((data.uid ?? null) !== (state.user?.id ?? null)) return;
+    if (data.deleted) {
+      setPersonalDbName('moneyflow-personal');
+      useAppStore.setState({ ...signedOutPatch() });
+      state.notify('账号已在其他标签页注销，本机数据已销毁', 'info');
+      return;
+    }
     if (data.mode === state.mode) void state.refresh();
   };
 }
@@ -91,6 +99,14 @@ function broadcast(mode: DataMode): void {
     channel?.postMessage({ mode, source: TAB_ID, uid: useAppStore.getState().user?.id ?? null });
   } catch {
     /* 广播失败不影响写入 */
+  }
+}
+
+function broadcastDeletion(uid: string): void {
+  try {
+    channel?.postMessage({ deleted: true, source: TAB_ID, uid });
+  } catch {
+    /* 广播失败不影响注销 */
   }
 }
 
@@ -240,6 +256,28 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       return apiErrorMessage(error, '保存找回问题失败，请重试');
     }
+  },
+
+  deleteAccount: async (currentPassword, confirmUsername) => {
+    const state = get();
+    if (!state.user) return '请先登录';
+    const user = state.user;
+    try {
+      await apiDeleteAccount(currentPassword, confirmUsername);
+    } catch (error) {
+      return apiErrorMessage(error, '注销账号失败，请稍后重试');
+    }
+    broadcastDeletion(user.id);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    try {
+      await destroyUserLocalData(user.id);
+    } catch {
+      // 浏览器存储受限时仍保留已完成的云端注销结果与本机登出。
+    }
+    setPersonalDbName('moneyflow-personal');
+    set({ ...signedOutPatch() });
+    get().notify('账号已注销，本机数据已销毁', 'success');
+    return null;
   },
 
   applyUser: (user) => set({ user }),
