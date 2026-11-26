@@ -14,64 +14,65 @@ interface Drop {
 }
 
 const TAU = Math.PI * 2;
+const SPRITE_SIZE = 64;
 
-function spawn(width: number, height: number, seedTop = false): Drop {
-  const size = 5 + Math.random() * 7;
+function buildCoinSprite(): HTMLCanvasElement {
+  const sprite = document.createElement('canvas');
+  sprite.width = SPRITE_SIZE;
+  sprite.height = SPRITE_SIZE;
+  const ctx = sprite.getContext('2d');
+  if (!ctx) return sprite;
+  const c = SPRITE_SIZE / 2;
+  const r = c - 2;
+
+  const face = ctx.createLinearGradient(0, 2, SPRITE_SIZE, SPRITE_SIZE - 2);
+  face.addColorStop(0, '#fff0b8');
+  face.addColorStop(0.34, '#f6d876');
+  face.addColorStop(0.68, '#dcae34');
+  face.addColorStop(1, '#b0821c');
+  ctx.fillStyle = face;
+  ctx.beginPath();
+  ctx.arc(c, c, r, 0, TAU);
+  ctx.fill();
+
+  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = 'rgba(122, 84, 12, 0.55)';
+  ctx.beginPath();
+  ctx.arc(c, c, r * 0.74, 0, TAU);
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(255, 246, 205, 0.65)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(c, c, r * 0.9, Math.PI * 1.06, Math.PI * 1.62);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(108, 76, 12, 0.85)';
+  ctx.font = '700 26px "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('¥', c, c + 1);
+  return sprite;
+}
+
+function spawn(width: number, height: number, windBias = 0, seedTop = false): Drop {
+  const size = 3.6 + Math.random() * 5.2;
+  const biased = -30 + Math.random() * (width + 60) - windBias * width * 0.38;
   return {
-    x: -20 + Math.random() * (width + 40),
-    y: seedTop ? -size * 2 - Math.random() * height * 0.35 : -size * 2 - Math.random() * 160,
-    vy: 42 + Math.random() * 95,
+    x: Math.max(-30, Math.min(width + 30, biased)),
+    y: seedTop ? -size * 2 - Math.random() * height * 0.45 : -size * 2 - Math.random() * 200,
+    vy: 55 + Math.random() * 115,
     vx: 0,
     size,
     spin: Math.random() * TAU,
-    spinRate: (0.8 + Math.random() * 2.4) * (Math.random() < 0.5 ? -1 : 1),
-    windFactor: 0.65 + Math.random() * 0.8,
+    spinRate: (0.9 + Math.random() * 2.8) * (Math.random() < 0.5 ? -1 : 1),
+    windFactor: 0.55 + Math.random() * 0.85,
     phase: Math.random() * TAU,
-    alpha: 0.3 + Math.random() * 0.55,
+    alpha: 0.32 + Math.random() * 0.58,
   };
 }
 
-function drawCoin(ctx: CanvasRenderingContext2D, drop: Drop, time: number) {
-  const squash = Math.cos(drop.spin);
-  const rx = Math.max(0.8, Math.abs(squash) * drop.size);
-  const ry = drop.size;
-  ctx.save();
-  ctx.translate(drop.x + Math.sin(time * 0.0011 + drop.phase) * 7, drop.y);
-  ctx.globalAlpha = drop.alpha;
-
-  const grad = ctx.createLinearGradient(-rx, -ry, rx, ry);
-  grad.addColorStop(0, '#fbe9a4');
-  grad.addColorStop(0.42, '#f2cf62');
-  grad.addColorStop(0.72, '#d9a92c');
-  grad.addColorStop(1, '#b8871f');
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.ellipse(0, 0, rx, ry, 0, 0, TAU);
-  ctx.fill();
-
-  if (Math.abs(squash) > 0.32) {
-    ctx.lineWidth = Math.max(0.7, drop.size * 0.08);
-    ctx.strokeStyle = 'rgba(122, 84, 12, 0.55)';
-    ctx.beginPath();
-    ctx.ellipse(0, 0, Math.max(0.6, rx * 0.72), ry * 0.72, 0, 0, TAU);
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(110, 78, 12, 0.82)';
-    ctx.font = `700 ${Math.max(5, drop.size * 0.95)}px "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.globalAlpha = drop.alpha * Math.min(1, Math.abs(squash) * 1.4);
-    ctx.fillText('¥', 0, drop.size * 0.04);
-  } else {
-    ctx.lineWidth = Math.max(1.4, drop.size * 0.22);
-    ctx.strokeStyle = 'rgba(173, 128, 30, 0.9)';
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 0.9, ry * 0.94, 0, 0, TAU);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-/** 顶部金币雨：数量多、颗粒小，鼠标偏向哪一侧，风向就把金币带向哪一侧。 */
+/** 顶部金币雨：颗粒小、数量多，鼠标偏向哪一侧，风向就把金币带向哪一侧。 */
 export function CoinRain() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -80,6 +81,7 @@ export function CoinRain() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    const sprite = buildCoinSprite();
 
     let width = 0;
     let height = 0;
@@ -98,9 +100,14 @@ export function CoinRain() {
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const target = Math.round(Math.min(150, Math.max(64, width / 9)));
+      const target = Math.round(Math.min(240, Math.max(110, width / 6)));
       if (drops.length > target) drops.length = target;
-      while (drops.length < target) drops.push(spawn(width, height, true));
+      const firstFill = drops.length === 0;
+      while (drops.length < target) {
+        const drop = spawn(width, height, 0, true);
+        if (firstFill) drop.y = -height * 0.1 + Math.random() * height;
+        drops.push(drop);
+      }
     };
 
     const onPointerMove = (event: PointerEvent) => {
@@ -116,25 +123,42 @@ export function CoinRain() {
       const reduce = document.documentElement.dataset.motion === 'reduced';
       const speed = reduce ? 0.55 : 1;
 
-      wind += (pointerX * 280 - wind) * Math.min(1, dt * 2.4);
-      const gust = Math.sin(now * 0.00042) * 26;
+      wind += (pointerX * 250 - wind) * Math.min(1, dt * 2.4);
+      const gust = Math.sin(now * 0.00042) * 22;
 
       ctx.clearRect(0, 0, width, height);
       for (const drop of drops) {
-        drop.vy += (34 - drop.vy * 0.04) * dt * speed;
-        drop.vx += (wind * drop.windFactor + gust - drop.vx) * Math.min(1, dt * 1.6);
+        drop.vy += (40 - drop.vy * 0.04) * dt * speed;
+        drop.vx += (wind * drop.windFactor + gust - drop.vx) * Math.min(1, dt * 1.8);
         drop.x += drop.vx * dt * speed;
         drop.y += drop.vy * dt * speed;
         drop.spin += drop.spinRate * dt * speed;
 
         const out = drop.y - drop.size > height || drop.x < -drop.size * 3 || drop.x > width + drop.size * 3;
         if (out) {
-          const next = spawn(width, height);
-          next.y = -next.size * 2 - Math.random() * 120;
+          const next = spawn(width, height, pointerX);
+          next.y = -next.size * 2 - Math.random() * 90;
           Object.assign(drop, next);
-        } else {
-          drawCoin(ctx, drop, now);
+          continue;
         }
+
+        const squash = Math.cos(drop.spin);
+        const ellipse = Math.max(0.12, Math.abs(squash));
+        const rx = drop.size * ellipse;
+        const ry = drop.size;
+        ctx.save();
+        ctx.globalAlpha = drop.alpha * (0.55 + ellipse * 0.45);
+        ctx.translate(drop.x + Math.sin(now * 0.0011 + drop.phase) * 6, drop.y);
+        if (Math.abs(squash) < 0.16) {
+          ctx.lineWidth = Math.max(1, drop.size * 0.2);
+          ctx.strokeStyle = 'rgba(173, 128, 30, 0.9)';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, Math.max(0.6, rx), ry * 0.94, 0, 0, TAU);
+          ctx.stroke();
+        } else {
+          ctx.drawImage(sprite, -rx, -ry, rx * 2, ry * 2);
+        }
+        ctx.restore();
       }
       raf = window.requestAnimationFrame(step);
     };
