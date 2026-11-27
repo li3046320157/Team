@@ -81,6 +81,8 @@ export async function readJson(request, maxBytes = BODY_LIMIT_BYTES) {
 
 export function rows(result) {
   if (result?.error || !Array.isArray(result?.data)) {
+    const code = typeof result?.error?.code === 'string' ? result.error.code : 'unknown';
+    console.error('database_query_failed', code);
     throw new AppError('database_unavailable', 503);
   }
   return result.data;
