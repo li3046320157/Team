@@ -190,7 +190,27 @@ function OverviewPanel({ onInspectUser }: { onInspectUser: (id: string) => void 
     setLoading(true);
     setError(null);
     apiAdminOverview()
-      .then((next) => setData(next))
+      .then((next) => setData({
+        ...next,
+        stats: {
+          totalUsers: next.stats?.totalUsers ?? 0,
+          disabledUsers: next.stats?.disabledUsers ?? 0,
+          newUsers7d: next.stats?.newUsers7d ?? 0,
+          activeToday: next.stats?.activeToday ?? 0,
+          active7d: next.stats?.active7d ?? 0,
+          viewsToday: next.stats?.viewsToday ?? 0,
+          views7d: next.stats?.views7d ?? 0,
+          totalAdmins: next.stats?.totalAdmins ?? 0,
+        },
+        activity: {
+          days: next.activity?.days ?? [],
+          complete: next.activity?.complete ?? true,
+        },
+        usageTop: next.usageTop ?? [],
+        recentUsers: next.recentUsers ?? [],
+        recentLogins: next.recentLogins ?? [],
+        recentEvents: next.recentEvents ?? [],
+      }))
       .catch((err) => setError(apiErrorMessage(err, '读取运行总览失败')))
       .finally(() => setLoading(false));
   };
@@ -580,10 +600,13 @@ function UsersPanel({ initialUserId, onInitialConsumed }: {
     apiAdminUsers(page, query)
       .then((data) => {
         if (cancelled) return;
-        setItems(data.items);
-        setTotal(data.total);
-        setHasMore(data.hasMore);
-        setTruncated(data.truncated);
+        setItems((data.items ?? []).map((item) => ({
+          ...item,
+          usage7d: item.usage7d ?? { views: 0, activeDays: 0, lastSeenAt: null },
+        })));
+        setTotal(data.total ?? 0);
+        setHasMore(Boolean(data.hasMore));
+        setTruncated(Boolean(data.truncated));
       })
       .catch((err) => {
         if (!cancelled) setError(apiErrorMessage(err, '读取用户列表失败'));

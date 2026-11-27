@@ -104,6 +104,8 @@ async function countRows(db, table, apply) {
   if (apply) query = apply(query);
   const result = await query.limit(1);
   if (result?.error || !Number.isSafeInteger(result?.count) || result.count < 0) {
+    const code = typeof result?.error?.code === 'string' ? result.error.code : 'count_unavailable';
+    console.error('database_count_failed', code);
     throw new AppError('database_unavailable', 503);
   }
   return result.count;
@@ -128,13 +130,30 @@ async function actorNames(db, events) {
   return new Map(entries);
 }
 
+const USAGE_DAY_PAGE = 100;
+const USAGE_DAY_MAX_PAGES = 10;
+
+// 线上数据库网关不接受超大范围查询，使用记录按天分页读取。
+async function usageOfDay(db, day) {
+  const collected = [];
+  for (let page = 0; page < USAGE_DAY_MAX_PAGES; page += 1) {
+    const from = page * USAGE_DAY_PAGE;
+    const batch = rows(await db.from('usage_daily')
+      .select('user_id,day,views,last_seen_at')
+      .eq('day', day)
+      .order('user_id', { ascending: true })
+      .range(from, from + USAGE_DAY_PAGE - 1));
+    collected.push(...batch);
+    if (batch.length < USAGE_DAY_PAGE) return { usage: collected, complete: true };
+  }
+  return { usage: collected, complete: false };
+}
+
 async function activityWindow(db, today, days = 7) {
   const start = shiftDay(today, -(days - 1));
-  const usage = rows(await db.from('usage_daily')
-    .select('user_id,day,views,last_seen_at')
-    .gte('day', start).lte('day', today)
-    .order('day', { ascending: false })
-    .limit(5000));
+  const dayList = Array.from({ length: days }, (_, offset) => shiftDay(start, offset));
+  const daily = await Promise.all(dayList.map((day) => usageOfDay(db, day)));
+  const usage = daily.flatMap((result) => result.usage);
 
   const byDay = new Map();
   for (let offset = 0; offset < days; offset += 1) {
@@ -168,7 +187,7 @@ async function activityWindow(db, today, days = 7) {
     })),
     activeUsers: new Set(usage.map((row) => row.user_id).filter(Boolean)).size,
     perUser,
-    complete: usage.length < 5000,
+    complete: daily.every((result) => result.complete),
   };
 }
 
