@@ -260,11 +260,28 @@ test('云端账户与管理员契约', async (t) => {
     assert.equal((await jsonOf(second)).tracked, true);
 
     const overview = await call(app, '/api/admin/overview', { cookie: adminCookie });
-    const stats = (await jsonOf(overview)).stats;
+    const overviewPayload = await jsonOf(overview);
+    const { stats } = overviewPayload;
     assert.equal(stats.totalUsers, 1);
     assert.equal(stats.newUsers7d, 1);
     assert.equal(stats.activeToday, 1);
     assert.equal(stats.active7d, 1);
+    assert.equal(stats.viewsToday, 2);
+    assert.equal(stats.views7d, 2);
+    assert.equal(stats.totalAdmins, 1);
+    assert.equal(overviewPayload.activity.days.length, 14);
+    assert.equal(overviewPayload.activity.complete, true);
+    assert.equal(overviewPayload.usageTop.length, 1);
+    assert.equal(overviewPayload.usageTop[0].username, username);
+    assert.equal(overviewPayload.usageTop[0].views, 2);
+    assert.equal(overviewPayload.usageTop[0].activeDays, 1);
+    assert.ok(overviewPayload.recentEvents.some((event) => event.kind === 'login'));
+
+    const listAfterUsage = await call(app, '/api/admin/users', { cookie: adminCookie });
+    const usageItem = (await jsonOf(listAfterUsage)).items[0];
+    assert.equal(usageItem.usage7d.views, 2);
+    assert.equal(usageItem.usage7d.activeDays, 1);
+    assert.ok(usageItem.usage7d.lastSeenAt);
 
     const detail = await call(app, `/api/admin/users/${userId}`, { cookie: adminCookie });
     assert.equal(detail.status, 200);
@@ -333,6 +350,154 @@ test('云端账户与管理员契约', async (t) => {
       body: { identifier: username, password },
     });
     userCookie = cookieOf(relogin);
+  });
+
+  await t.test('管理员团队：创建、只读边界与停用撤销', async () => {
+    const team = await call(app, '/api/admin/admins', { cookie: adminCookie });
+    assert.equal(team.status, 200);
+    const teamPayload = await jsonOf(team);
+    assert.equal(teamPayload.you.isRoot, true);
+    assert.equal(teamPayload.items.length, 1);
+    assert.equal(teamPayload.items[0].isRoot, true);
+    assert.equal(teamPayload.items[0].username, 'ledger-root');
+
+    const userForbidden = await call(app, '/api/admin/admins', { cookie: userCookie });
+    assert.equal(userForbidden.status, 403);
+    assert.equal((await jsonOf(userForbidden)).error, 'forbidden');
+
+    const weakPassword = await call(app, '/api/admin/admins', {
+      method: 'POST',
+      cookie: adminCookie,
+      body: { username: 'ops-admin', password: 'short1' },
+    });
+    assert.equal(weakPassword.status, 400);
+    assert.equal((await jsonOf(weakPassword)).error, 'weak_admin_password');
+
+    const created = await call(app, '/api/admin/admins', {
+      method: 'POST',
+      cookie: adminCookie,
+      body: { username: 'ops-admin', password: 'OpsAdmin2026' },
+    });
+    assert.equal(created.status, 201);
+    const createdPayload = await jsonOf(created);
+    assert.equal(createdPayload.admin.username, 'ops-admin');
+    assert.equal(createdPayload.admin.status, 'active');
+    assert.equal(createdPayload.admin.isRoot, false);
+    assert.equal(createdPayload.admin.mustChangePassword, true);
+    const subAdminId = createdPayload.admin.id;
+
+    const duplicate = await call(app, '/api/admin/admins', {
+      method: 'POST',
+      cookie: adminCookie,
+      body: { username: 'OPS-ADMIN', password: 'OpsAdmin2026' },
+    });
+    assert.equal(duplicate.status, 409);
+    assert.equal((await jsonOf(duplicate)).error, 'username_taken');
+
+    const subLogin = await call(app, '/api/login', {
+      method: 'POST',
+      body: { identifier: 'ops-admin', password: 'OpsAdmin2026' },
+    });
+    assert.equal(subLogin.status, 200);
+    const subLoginPayload = await jsonOf(subLogin);
+    assert.equal(subLoginPayload.user.role, 'admin');
+    assert.equal(subLoginPayload.user.mustChangePassword, true);
+    const subCookie = cookieOf(subLogin);
+
+    const gated = await call(app, '/api/admin/admins', { cookie: subCookie });
+    assert.equal(gated.status, 403);
+    assert.equal((await jsonOf(gated)).error, 'admin_password_change_required');
+
+    const subChanged = await call(app, '/api/admin/credentials', {
+      method: 'POST',
+      cookie: subCookie,
+      body: { currentPassword: 'OpsAdmin2026', newPassword: 'OpsAdmin2027' },
+    });
+    assert.equal(subChanged.status, 200);
+    assert.equal((await jsonOf(subChanged)).user.mustChangePassword, false);
+
+    const subLogin2 = await call(app, '/api/login', {
+      method: 'POST',
+      body: { identifier: 'ops-admin', password: 'OpsAdmin2027' },
+    });
+    assert.equal(subLogin2.status, 200);
+    let subCookie2 = cookieOf(subLogin2);
+
+    const subCreate = await call(app, '/api/admin/admins', {
+      method: 'POST',
+      cookie: subCookie2,
+      body: { username: 'third-admin', password: 'ThirdAdmin2026' },
+    });
+    assert.equal(subCreate.status, 403);
+    assert.equal((await jsonOf(subCreate)).error, 'forbidden');
+
+    const subTeam = await call(app, '/api/admin/admins', { cookie: subCookie2 });
+    assert.equal(subTeam.status, 200);
+    const subTeamPayload = await jsonOf(subTeam);
+    assert.equal(subTeamPayload.you.isRoot, false);
+    assert.equal(subTeamPayload.items.length, 2);
+    assert.equal(subTeamPayload.items.filter((item) => item.isRoot).length, 1);
+
+    const subOverview = await call(app, '/api/admin/overview', { cookie: subCookie2 });
+    assert.equal(subOverview.status, 200);
+    assert.equal((await jsonOf(subOverview)).stats.totalAdmins, 2);
+
+    const selfDisable = await call(app, `/api/admin/admins/${adminId}/status`, {
+      method: 'POST',
+      cookie: adminCookie,
+      body: { status: 'disabled' },
+    });
+    assert.equal(selfDisable.status, 409);
+    assert.equal((await jsonOf(selfDisable)).error, 'admin_cannot_disable_self');
+
+    const revoke = await call(app, `/api/admin/admins/${subAdminId}/revoke-sessions`, {
+      method: 'POST',
+      cookie: adminCookie,
+    });
+    assert.equal(revoke.status, 200);
+    assert.ok((await jsonOf(revoke)).sessionsRevoked >= 1);
+    const stale = await call(app, '/api/me', { cookie: subCookie2 });
+    assert.equal(stale.status, 401);
+
+    const disabled = await call(app, `/api/admin/admins/${subAdminId}/status`, {
+      method: 'POST',
+      cookie: adminCookie,
+      body: { status: 'disabled' },
+    });
+    assert.equal(disabled.status, 200);
+    assert.equal((await jsonOf(disabled)).admin.status, 'disabled');
+
+    const blockedLogin = await call(app, '/api/login', {
+      method: 'POST',
+      body: { identifier: 'ops-admin', password: 'OpsAdmin2027' },
+    });
+    assert.equal(blockedLogin.status, 403);
+    assert.equal((await jsonOf(blockedLogin)).error, 'account_disabled');
+
+    const enabled = await call(app, `/api/admin/admins/${subAdminId}/status`, {
+      method: 'POST',
+      cookie: adminCookie,
+      body: { status: 'active' },
+    });
+    assert.equal(enabled.status, 200);
+    assert.equal((await jsonOf(enabled)).admin.status, 'active');
+
+    const reLogin = await call(app, '/api/login', {
+      method: 'POST',
+      body: { identifier: 'ops-admin', password: 'OpsAdmin2027' },
+    });
+    assert.equal(reLogin.status, 200);
+    subCookie2 = cookieOf(reLogin);
+
+    const finalTeam = await jsonOf(await call(app, '/api/admin/admins', { cookie: adminCookie }));
+    assert.equal(finalTeam.items.length, 2);
+    assert.equal(finalTeam.items.find((item) => item.id === adminId).isRoot, true);
+    assert.equal(finalTeam.items.find((item) => item.id === subAdminId).isRoot, false);
+
+    const overviewPayload = await jsonOf(await call(app, '/api/admin/overview', { cookie: adminCookie }));
+    assert.ok(overviewPayload.recentEvents.some((event) => event.kind === 'admin_created'));
+    assert.ok(overviewPayload.recentEvents.some((event) => event.kind === 'admin_disabled'));
+    assert.ok(overviewPayload.recentEvents.some((event) => event.kind === 'admin_sessions_revoked'));
   });
 
   await t.test('用户修改密码后撤销全部会话', async () => {
