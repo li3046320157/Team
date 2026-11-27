@@ -8,12 +8,27 @@ export interface AdminStats {
   newUsers7d: number;
   activeToday: number;
   active7d: number;
+  viewsToday: number;
+  views7d: number;
+  totalAdmins: number;
 }
 
 export interface AdminActivityDay {
   day: string;
   activeUsers: number;
   views: number;
+}
+
+export interface AdminUsageSummary {
+  views: number;
+  activeDays: number;
+  lastSeenAt: string | null;
+}
+
+export interface AdminUsageUser extends AdminUsageSummary {
+  userId: string;
+  username: string;
+  status: 'active' | 'disabled';
 }
 
 export interface AdminUserSummary {
@@ -25,6 +40,7 @@ export interface AdminUserSummary {
   lastLoginAt: string | null;
   lastActiveAt: string | null;
   loginCount: number;
+  usage7d: AdminUsageSummary;
 }
 
 export interface AdminRecentLogin {
@@ -34,12 +50,23 @@ export interface AdminRecentLogin {
   userAgent: string | null;
 }
 
+export interface AdminRecentEvent {
+  id: string;
+  kind: string;
+  username: string;
+  actorName: string | null;
+  at: string;
+  userAgent: string | null;
+}
+
 export interface AdminOverview {
   generatedAt: string;
   stats: AdminStats;
   activity: { days: AdminActivityDay[]; complete: boolean };
+  usageTop: AdminUsageUser[];
   recentUsers: AdminUserSummary[];
   recentLogins: AdminRecentLogin[];
+  recentEvents: AdminRecentEvent[];
 }
 
 export interface AdminUserPage {
@@ -85,9 +112,32 @@ export interface AdminUserDetail {
 
 export interface AdminSecurityInfo {
   admin: AuthUser & { lastActiveAt: string | null; loginCount: number };
+  isRoot: boolean;
   session: { expiresAt: string };
   activeSessions: number;
   events: AdminEvent[];
+}
+
+export interface AdminAccount {
+  id: string;
+  username: string;
+  status: 'active' | 'disabled';
+  isRoot: boolean;
+  mustChangePassword: boolean;
+  createdAt: string | null;
+  lastLoginAt: string | null;
+  lastActiveAt: string | null;
+  loginCount: number;
+  activeSessions: number;
+}
+
+export interface AdminTeamInfo {
+  you: { id: string; isRoot: boolean };
+  items: AdminAccount[];
+}
+
+export interface AdminCreateResult {
+  admin: AdminAccount;
 }
 
 export interface AdminCredentialsResult {
@@ -125,6 +175,31 @@ export function apiAdminRevokeSessions(id: string): Promise<{ ok: boolean; sessi
 
 export function apiAdminSecurity(): Promise<AdminSecurityInfo> {
   return apiRequest<AdminSecurityInfo>('/api/admin/security');
+}
+
+export function apiAdminTeam(): Promise<AdminTeamInfo> {
+  return apiRequest<AdminTeamInfo>('/api/admin/admins');
+}
+
+export function apiAdminCreateAdmin(input: { username: string; password: string }): Promise<AdminCreateResult> {
+  return apiRequest<AdminCreateResult>('/api/admin/admins', {
+    method: 'POST',
+    body: { username: input.username, password: input.password },
+  });
+}
+
+export function apiAdminSetAdminStatus(id: string, status: 'active' | 'disabled'): Promise<{ admin: AdminAccount; sessionsRevoked: number }> {
+  return apiRequest(`/api/admin/admins/${encodeURIComponent(id)}/status`, {
+    method: 'POST',
+    body: { status },
+  });
+}
+
+export function apiAdminRevokeAdminSessions(id: string): Promise<{ ok: boolean; sessionsRevoked: number }> {
+  return apiRequest(`/api/admin/admins/${encodeURIComponent(id)}/revoke-sessions`, {
+    method: 'POST',
+    body: {},
+  });
 }
 
 export function apiAdminCredentials(input: {

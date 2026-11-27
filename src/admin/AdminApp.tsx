@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Crown,
   Eye,
   EyeOff,
   KeyRound,
@@ -15,6 +16,8 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  UserCog,
+  UserPlus,
   UserRound,
   Users,
   X,
@@ -23,34 +26,46 @@ import { apiErrorMessage } from '../data/api-core';
 import { validateAdminPassword, type AuthUser } from '../data/auth';
 import { useAppStore } from '../store/useAppStore';
 import {
+  apiAdminCreateAdmin,
   apiAdminCredentials,
   apiAdminOverview,
+  apiAdminRevokeAdminSessions,
   apiAdminRevokeSessions,
   apiAdminSecurity,
+  apiAdminSetAdminStatus,
   apiAdminSetStatus,
+  apiAdminTeam,
   apiAdminUserDetail,
   apiAdminUsers,
+  type AdminAccount,
   type AdminActivityDay,
   type AdminEvent,
   type AdminOverview,
   type AdminSecurityInfo,
+  type AdminTeamInfo,
+  type AdminUsageUser,
   type AdminUserDetail,
   type AdminUserSummary,
 } from './admin-api';
 import './admin.css';
 
-type AdminTab = 'overview' | 'users' | 'security';
+type AdminTab = 'overview' | 'users' | 'team' | 'security';
 
 const TAB_META: Record<AdminTab, { title: string; subtitle: string; kicker: string }> = {
   overview: {
     title: '运行总览',
-    subtitle: '账户注册、活跃与登录动态，仅包含账户与使用元数据',
+    subtitle: '账户注册、活跃、使用强度与登录动态，仅包含账户与使用元数据',
     kicker: 'ACCOUNT OPERATIONS',
   },
   users: {
-    title: '用户管理',
-    subtitle: '检索账户、查看使用概况、停用账户或撤销登录状态',
+    title: '用户与使用',
+    subtitle: '检索账户、查看近 7 天使用强度、停用账户或撤销登录状态',
     kicker: 'USER DIRECTORY',
+  },
+  team: {
+    title: '管理员团队',
+    subtitle: '超级管理员可创建维护账号、停用管理员并撤销其登录会话',
+    kicker: 'ROOT CONTROL',
   },
   security: {
     title: '安全与账户',
@@ -72,6 +87,10 @@ const EVENT_LABELS: Record<string, string> = {
   user_enabled: '被管理员恢复',
   sessions_revoked: '被管理员强制下线',
   admin_credentials_changed: '管理员更新凭据',
+  admin_created: '创建管理员',
+  admin_disabled: '管理员被停用',
+  admin_enabled: '管理员被恢复',
+  admin_sessions_revoked: '管理员被强制下线',
 };
 
 function formatDateTime(value: string | null | undefined): string {
@@ -196,17 +215,22 @@ function OverviewPanel({ onInspectUser }: { onInspectUser: (id: string) => void 
         <div className="admin-stat">
           <span className="admin-stat-label"><Activity size={12} /> 今日活跃</span>
           <p className="admin-stat-value">{stats.activeToday}</p>
-          <p className="admin-stat-note">按上海时区统计</p>
+          <p className="admin-stat-note">今日心跳 {stats.viewsToday} 次 · 上海时区</p>
         </div>
         <div className="admin-stat">
           <span className="admin-stat-label"><Clock size={12} /> 近 7 天活跃</span>
           <p className="admin-stat-value">{stats.active7d}</p>
-          <p className="admin-stat-note">至少打开过一次账本</p>
+          <p className="admin-stat-note">近 7 天心跳 {stats.views7d} 次</p>
         </div>
         <div className="admin-stat">
           <span className="admin-stat-label"><UserRound size={12} /> 近 7 天新增</span>
           <p className="admin-stat-value">{stats.newUsers7d}</p>
           <p className="admin-stat-note">滚动 7 天注册量</p>
+        </div>
+        <div className="admin-stat">
+          <span className="admin-stat-label"><Crown size={12} /> 管理员团队</span>
+          <p className="admin-stat-value">{stats.totalAdmins}</p>
+          <p className="admin-stat-note">含超级管理员</p>
         </div>
         <div className="admin-stat">
           <span className="admin-stat-label"><AlertTriangle size={12} /> 已停用</span>
@@ -217,7 +241,7 @@ function OverviewPanel({ onInspectUser }: { onInspectUser: (id: string) => void 
 
       <div className="admin-section-head">
         <div>
-          <h2>近 7 天使用动态</h2>
+          <h2>近 14 天使用动态</h2>
           <p>仅统计账户活跃与心跳次数，不包含任何账目、金额或分类信息。</p>
         </div>
         <button type="button" className="admin-button" onClick={load} disabled={loading}>
@@ -228,10 +252,37 @@ function OverviewPanel({ onInspectUser }: { onInspectUser: (id: string) => void 
       {error && <ErrorBlock message={error} onRetry={load} />}
 
       <div className="admin-grid-2">
-        <Panel title="活跃用户趋势" subtitle="柱高代表每天打开账本的去重用户数">
+        <Panel title="活跃用户趋势" subtitle="柱高代表每天打开账本的去重用户数，悬浮可查看心跳">
           <ActivityBars days={data.activity.days} />
           {!data.activity.complete && <p className="admin-note" style={{ marginTop: 12 }}>数据量较大，趋势仅展示前 5000 条使用记录。</p>}
         </Panel>
+        <Panel title="近 7 天使用排行" subtitle="按应用内使用次数排序，点击查看用户详情">
+          <div className="admin-list">
+            {data.usageTop.length === 0 && <p className="admin-empty">近 7 天还没有使用记录</p>}
+            {data.usageTop.map((item: AdminUsageUser) => (
+              <button
+                type="button"
+                className="admin-list-row is-clickable"
+                key={item.userId}
+                onClick={() => onInspectUser(item.userId)}
+              >
+                <div className="admin-list-main">
+                  <strong>{item.username}</strong>
+                  <span>{item.activeDays} 天活跃 · 最近 {formatDateTime(item.lastSeenAt)}</span>
+                </div>
+                <div className="admin-list-side">
+                  <strong className="admin-usage-count">{item.views}</strong> 次
+                  <span className={`admin-badge ${item.status === 'active' ? 'is-active' : 'is-disabled'}`} style={{ marginLeft: 8 }}>
+                    {item.status === 'active' ? '正常' : '已停用'}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </Panel>
+      </div>
+
+      <div className="admin-grid-2">
         <Panel title="最近登录" subtitle="最新 8 次普通用户登录">
           <div className="admin-list">
             {data.recentLogins.length === 0 && <p className="admin-empty">暂无登录记录</p>}
@@ -240,6 +291,24 @@ function OverviewPanel({ onInspectUser }: { onInspectUser: (id: string) => void 
                 <div className="admin-list-main">
                   <strong>{event.username}</strong>
                   <span>{event.userAgent ?? '未知设备'}</span>
+                </div>
+                <div className="admin-list-side">{formatDateTime(event.at)}</div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+        <Panel title="账户动态" subtitle="最近 10 条账户与管理员操作记录">
+          <div className="admin-list">
+            {data.recentEvents.length === 0 && <p className="admin-empty">暂无动态</p>}
+            {data.recentEvents.map((event) => (
+              <div className="admin-list-row" key={event.id}>
+                <div className="admin-list-main">
+                  <strong>{event.username}</strong>
+                  <span>
+                    {eventLabel(event.kind)}
+                    {event.actorName ? ` · 操作人 ${event.actorName}` : ''}
+                    {' · '}{event.userAgent ?? '未知设备'}
+                  </span>
                 </div>
                 <div className="admin-list-side">{formatDateTime(event.at)}</div>
               </div>
@@ -260,10 +329,9 @@ function OverviewPanel({ onInspectUser }: { onInspectUser: (id: string) => void 
           {data.recentUsers.map((user) => (
             <button
               type="button"
-              className="admin-list-row"
+              className="admin-list-row is-clickable"
               key={user.id}
               onClick={() => onInspectUser(user.id)}
-              style={{ width: '100%', background: 'none', borderLeft: 0, borderRight: 0, borderTop: 0, textAlign: 'left', cursor: 'pointer' }}
             >
               <div className="admin-list-main">
                 <strong>{user.username}</strong>
@@ -582,6 +650,7 @@ function UsersPanel({ initialUserId, onInitialConsumed }: {
                     <tr>
                       <th>用户</th>
                       <th>状态</th>
+                      <th>近 7 天使用</th>
                       <th>注册时间</th>
                       <th>最近登录</th>
                       <th>登录次数</th>
@@ -602,6 +671,15 @@ function UsersPanel({ initialUserId, onInitialConsumed }: {
                           <span className="admin-row-sub">{user.phoneMasked ?? '未绑定手机号'}</span>
                         </td>
                         <td><span className={`admin-badge ${user.status === 'active' ? 'is-active' : 'is-disabled'}`}>{user.status === 'active' ? '正常' : '已停用'}</span></td>
+                        <td>
+                          {user.usage7d.views > 0 ? (
+                            <span className="admin-usage-cell">
+                              <strong>{user.usage7d.views}</strong> 次 · {user.usage7d.activeDays} 天
+                            </span>
+                          ) : (
+                            <span className="admin-row-sub" style={{ display: 'inline' }}>近 7 天未使用</span>
+                          )}
+                        </td>
                         <td>{formatDateTime(user.createdAt)}</td>
                         <td>{formatDateTime(user.lastLoginAt)}</td>
                         <td>{user.loginCount}</td>
@@ -633,6 +711,300 @@ function UsersPanel({ initialUserId, onInitialConsumed }: {
           onClose={() => setDetailId(null)}
           onChanged={() => setReloadToken((value) => value + 1)}
         />
+      )}
+    </div>
+  );
+}
+
+function CreateAdminForm({ onCreated }: { onCreated: () => void }) {
+  const notify = useAppStore((s) => s.notify);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    const name = username.trim();
+    if (!/^[\w\u4e00-\u9fa5-]{2,20}$/.test(name)) {
+      setError('用户名需为 2–20 位字母、数字、下划线、连字符或中文');
+      return;
+    }
+    const passwordError = validateAdminPassword(password);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
+    if (password !== confirm) {
+      setError('两次输入的初始密码不一致');
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await apiAdminCreateAdmin({ username: name, password });
+      setUsername('');
+      setPassword('');
+      setConfirm('');
+      notify(`管理员「${result.admin.username}」已创建，首次登录需设置新密码`, 'success');
+      onCreated();
+    } catch (err) {
+      setError(apiErrorMessage(err, '创建管理员失败'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={(event) => void submit(event)} data-testid="admin-create-form">
+      <label className="admin-field">
+        <span className="admin-label">新管理员用户名</span>
+        <input
+          className="admin-input"
+          value={username}
+          onChange={(event) => setUsername(event.target.value)}
+          maxLength={20}
+          autoComplete="off"
+          placeholder="2–20 位，支持中文"
+          data-testid="admin-create-username"
+        />
+      </label>
+      <div className="admin-form-grid" style={{ marginTop: 10 }}>
+        <label className="admin-field">
+          <span className="admin-label">初始密码</span>
+          <input
+            className="admin-input"
+            type={show ? 'text' : 'password'}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="new-password"
+            placeholder="至少 10 位，含字母和数字"
+            data-testid="admin-create-password"
+          />
+        </label>
+        <label className="admin-field">
+          <span className="admin-label">确认初始密码</span>
+          <input
+            className="admin-input"
+            type={show ? 'text' : 'password'}
+            value={confirm}
+            onChange={(event) => setConfirm(event.target.value)}
+            autoComplete="new-password"
+            data-testid="admin-create-confirm"
+          />
+        </label>
+      </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 10, color: 'var(--admin-muted)', fontSize: 10.5 }}>
+        <input type="checkbox" checked={show} onChange={(event) => setShow(event.target.checked)} />
+        显示初始密码
+      </label>
+      {error && <div className="admin-error" style={{ marginTop: 12 }} role="alert">{error}</div>}
+      <p className="admin-note" style={{ marginTop: 12 }}>
+        新管理员首次登录会被要求设置自己的用户名与安全密码，初始密码仅用于接管。
+      </p>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+        <button type="submit" className="admin-button is-primary" disabled={busy} data-testid="admin-create-submit">
+          <UserPlus size={13} /> {busy ? '创建中…' : '创建管理员'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+type TeamConfirm = { kind: 'disable' | 'enable' | 'revoke'; id: string; username: string };
+
+function TeamPanel() {
+  const notify = useAppStore((s) => s.notify);
+  const [data, setData] = useState<AdminTeamInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<TeamConfirm | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    apiAdminTeam()
+      .then((next) => setData(next))
+      .catch((err) => setError(apiErrorMessage(err, '读取管理员团队失败')))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const changeStatus = async (account: AdminAccount, status: 'active' | 'disabled') => {
+    setBusyId(account.id);
+    setActionError(null);
+    try {
+      const result = await apiAdminSetAdminStatus(account.id, status);
+      setConfirm(null);
+      notify(
+        status === 'disabled'
+          ? `管理员「${result.admin.username}」已停用${result.sessionsRevoked > 0 ? `，并撤销 ${result.sessionsRevoked} 个会话` : ''}`
+          : `管理员「${result.admin.username}」已恢复`,
+        'success',
+      );
+      load();
+    } catch (err) {
+      setActionError(apiErrorMessage(err, '更新管理员状态失败'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const revokeSessions = async (account: AdminAccount) => {
+    setBusyId(account.id);
+    setActionError(null);
+    try {
+      const result = await apiAdminRevokeAdminSessions(account.id);
+      setConfirm(null);
+      notify(`已撤销管理员「${account.username}」的 ${result.sessionsRevoked} 个登录会话`, 'success');
+      load();
+    } catch (err) {
+      setActionError(apiErrorMessage(err, '撤销管理员会话失败'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const runConfirm = () => {
+    if (!confirm || !data) return;
+    const account = data.items.find((item) => item.id === confirm.id);
+    if (!account) return;
+    if (confirm.kind === 'revoke') void revokeSessions(account);
+    else void changeStatus(account, confirm.kind === 'disable' ? 'disabled' : 'active');
+  };
+
+  const confirmMessage = confirm?.kind === 'disable'
+    ? `确认停用管理员「${confirm.username}」？其全部登录会话会立即失效，之后无法登录控制台。`
+    : confirm?.kind === 'enable'
+      ? `确认恢复管理员「${confirm.username}」的访问权限？`
+      : confirm
+        ? `确认强制管理员「${confirm.username}」退出所有设备？账户仍可重新登录。`
+        : '';
+
+  return (
+    <div className="admin-page" data-testid="admin-team">
+      <div className="admin-section-head">
+        <div>
+          <h2>管理员团队</h2>
+          <p>超级管理员为最早创建的管理员，负责创建、停用其他管理员并撤销其会话。</p>
+        </div>
+        <button type="button" className="admin-button" onClick={load} disabled={loading}>
+          <RefreshCw size={13} /> 刷新
+        </button>
+      </div>
+
+      {error && <ErrorBlock message={error} onRetry={load} />}
+      {loading && !data && <LoadingBlock label="正在读取管理员列表…" />}
+
+      {data && (
+        <div className="admin-grid-2">
+          <Panel title={`管理员账户 · ${data.items.length}`} subtitle="用户名、状态、会话与首次登录状态">
+            {actionError && <div className="admin-error" role="alert">{actionError}</div>}
+            {confirm && (
+              <div className="admin-confirm" data-testid="admin-team-confirm">
+                <p>{confirmMessage}</p>
+                <div className="admin-confirm-actions">
+                  <button type="button" className="admin-button" onClick={() => setConfirm(null)} disabled={busyId !== null}>取消</button>
+                  <button
+                    type="button"
+                    className={`admin-button ${confirm.kind === 'enable' ? 'is-primary' : 'is-danger'}`}
+                    onClick={runConfirm}
+                    disabled={busyId !== null}
+                    data-testid="admin-team-confirm-yes"
+                  >
+                    {busyId !== null ? '处理中…' : '确认'}
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="admin-team-list">
+              {data.items.map((account) => {
+                const isSelf = account.id === data.you.id;
+                return (
+                  <div className="admin-team-row" key={account.id} data-testid="admin-account-row">
+                    <div className="admin-team-main">
+                      <div className="admin-team-name">
+                        <strong>{account.username}</strong>
+                        {account.isRoot && <span className="admin-badge is-root"><Crown size={10} /> 超级管理员</span>}
+                        {isSelf && <span className="admin-badge">当前账户</span>}
+                        <span className={`admin-badge ${account.status === 'active' ? 'is-active' : 'is-disabled'}`}>
+                          {account.status === 'active' ? '正常' : '已停用'}
+                        </span>
+                        {account.mustChangePassword && <span className="admin-badge is-amber">待改初始密码</span>}
+                      </div>
+                      <span className="admin-row-sub">
+                        {account.activeSessions} 个有效会话 · 最近登录 {formatDateTime(account.lastLoginAt)} · 创建于 {formatDateTime(account.createdAt)}
+                      </span>
+                    </div>
+                    <div className="admin-team-actions">
+                      {account.isRoot ? (
+                        <span className="admin-row-sub">受保护</span>
+                      ) : data.you.isRoot ? (
+                        <>
+                          <button
+                            type="button"
+                            className={`admin-button ${account.status === 'active' ? 'is-danger' : 'is-primary'}`}
+                            onClick={() => setConfirm({ kind: account.status === 'active' ? 'disable' : 'enable', id: account.id, username: account.username })}
+                            disabled={busyId !== null}
+                            data-testid="admin-account-toggle"
+                          >
+                            {account.status === 'active' ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />}
+                            {account.status === 'active' ? '停用' : '恢复'}
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-button"
+                            onClick={() => setConfirm({ kind: 'revoke', id: account.id, username: account.username })}
+                            disabled={busyId !== null || account.activeSessions === 0}
+                            data-testid="admin-account-revoke"
+                          >
+                            <LogOut size={12} /> 强制下线
+                          </button>
+                        </>
+                      ) : (
+                        <span className="admin-row-sub">仅超级管理员可操作</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="admin-note" style={{ marginTop: 12 }}>
+              停用管理员会同时撤销其全部登录会话；超级管理员账户受保护，不能被停用或下线。
+            </p>
+          </Panel>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {data.you.isRoot ? (
+              <Panel title="新增管理员" subtitle="创建后可进入同一控制台，初始密码仅用于首次登录">
+                <CreateAdminForm onCreated={load} />
+              </Panel>
+            ) : (
+              <Panel title="只读访问" subtitle="你的管理员角色由超级管理员分配">
+                <div className="admin-gate-warning" style={{ marginTop: 0 }}>
+                  <ShieldCheck size={16} style={{ flex: 'none', marginTop: 1 }} />
+                  <span>只有超级管理员可以新增、停用管理员或撤销管理员会话。你仍可查看运行总览、用户目录与使用数据。</span>
+                </div>
+              </Panel>
+            )}
+            <Panel title="管理员职责" subtitle="团队协作边界">
+              <div className="admin-detail-grid">
+                <div className="admin-detail-cell"><span>可见</span><strong>账户资料 / 登录与活跃时间 / 使用心跳 / 会话状态</strong></div>
+                <div className="admin-detail-cell"><span>不可见</span><strong>账本流水 / 金额 / 分类 / AI 对话 / 本机备份</strong></div>
+              </div>
+              <p className="admin-note" style={{ marginTop: 12 }}>
+                管理员操作会写入账户安全记录，便于超级管理员审计团队行为。
+              </p>
+            </Panel>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -820,7 +1192,7 @@ function SecurityPanel() {
           <Panel title="当前账户" subtitle="管理员视角与普通用户界面完全隔离">
             <div className="admin-detail-grid">
               <div className="admin-detail-cell"><span>用户名</span><strong>{user.username}</strong></div>
-              <div className="admin-detail-cell"><span>角色</span><strong>ADMIN / ROOT</strong></div>
+              <div className="admin-detail-cell"><span>角色</span><strong>{data ? (data.isRoot ? 'ADMIN / ROOT' : 'ADMIN / MAINTAINER') : 'ADMIN'}</strong></div>
               <div className="admin-detail-cell"><span>最近登录</span><strong>{formatDateTime(user.lastLoginAt)}</strong></div>
               <div className="admin-detail-cell"><span>当前会话到期</span><strong>{formatDateTime(data?.session.expiresAt)}</strong></div>
               <div className="admin-detail-cell"><span>有效会话</span><strong>{data?.activeSessions ?? '—'}</strong></div>
@@ -1035,6 +1407,9 @@ export function AdminApp() {
       <button type="button" className={`admin-nav-item ${tab === 'users' ? 'is-active' : ''}`} onClick={() => setTab('users')} aria-current={tab === 'users' ? 'page' : undefined} data-testid="admin-nav-users">
         <Users size={16} /> 用户管理
       </button>
+      <button type="button" className={`admin-nav-item ${tab === 'team' ? 'is-active' : ''}`} onClick={() => setTab('team')} aria-current={tab === 'team' ? 'page' : undefined} data-testid="admin-nav-team">
+        <UserCog size={16} /> 管理员团队
+      </button>
       <button type="button" className={`admin-nav-item ${tab === 'security' ? 'is-active' : ''}`} onClick={() => setTab('security')} aria-current={tab === 'security' ? 'page' : undefined} data-testid="admin-nav-security">
         <ShieldCheck size={16} /> 安全与账户
       </button>
@@ -1097,6 +1472,7 @@ export function AdminApp() {
             {tab === 'users' && (
               <UsersPanel initialUserId={inspectId} onInitialConsumed={() => setInspectId(null)} />
             )}
+            {tab === 'team' && <TeamPanel />}
             {tab === 'security' && <SecurityPanel />}
           </div>
         </main>

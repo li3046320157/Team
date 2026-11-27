@@ -509,9 +509,13 @@ test('管理员：首登强制改密、用户管理与独立控制台', async ({
   await adminPage.getByTestId('admin-gate-submit').click();
   await expect(adminPage.getByTestId('admin-overview')).toBeVisible({ timeout: 30_000 });
   await expect(adminPage.getByTestId('admin-gate')).toHaveCount(0);
+  await expect(adminPage.getByTestId('admin-overview')).toContainText('近 14 天使用动态');
+  await expect(adminPage.getByTestId('admin-overview')).toContainText('近 7 天使用排行');
+  await expect(adminPage.getByTestId('admin-overview')).toContainText('账户动态');
 
   await adminPage.getByRole('navigation', { name: '管理员导航', exact: true }).getByTestId('admin-nav-users').click();
   await expect(adminPage.getByTestId('admin-users')).toBeVisible();
+  await expect(adminPage.getByRole('columnheader', { name: '近 7 天使用' })).toBeVisible();
   await expect(adminPage.getByTestId('admin-user-row').filter({ hasText: 'e2e注销员' })).toHaveCount(0);
   const row = adminPage.getByTestId('admin-user-row').filter({ hasText: 'e2e演示员' }).first();
   await expect(row).toBeVisible();
@@ -528,8 +532,33 @@ test('管理员：首登强制改密、用户管理与独立控制台', async ({
   await adminPage.keyboard.press('Escape');
   await expect(detail).toBeHidden();
 
+  await adminPage.getByRole('navigation', { name: '管理员导航', exact: true }).getByTestId('admin-nav-team').click();
+  await expect(adminPage.getByTestId('admin-team')).toBeVisible();
+  await expect(adminPage.getByTestId('admin-account-row')).toHaveCount(1);
+  await expect(adminPage.getByTestId('admin-account-row').first()).toContainText('超级管理员');
+  await adminPage.getByTestId('admin-create-username').fill('e2e副管');
+  await adminPage.getByTestId('admin-create-password').fill('E2eOps2026');
+  await adminPage.getByTestId('admin-create-confirm').fill('E2eOps2026');
+  await adminPage.getByTestId('admin-create-submit').click();
+  const subRow = adminPage.getByTestId('admin-account-row').filter({ hasText: 'e2e副管' });
+  await expect(subRow).toBeVisible();
+  await expect(subRow).toContainText('待改初始密码');
+  await expect(adminPage.getByTestId('admin-account-row')).toHaveCount(2);
+
+  await subRow.getByTestId('admin-account-toggle').click();
+  await expect(adminPage.getByTestId('admin-team-confirm')).toContainText('确认停用管理员「e2e副管」');
+  await adminPage.getByTestId('admin-team-confirm-yes').click();
+  await expect(subRow).toContainText('已停用');
+  await expect(subRow.getByTestId('admin-account-toggle')).toContainText('恢复');
+  await subRow.getByTestId('admin-account-toggle').click();
+  await expect(adminPage.getByTestId('admin-team-confirm')).toContainText('确认恢复管理员「e2e副管」');
+  await adminPage.getByTestId('admin-team-confirm-yes').click();
+  await expect(subRow).toContainText('正常');
+  await expect(subRow).not.toContainText('已停用');
+
   await adminPage.getByRole('navigation', { name: '管理员导航', exact: true }).getByTestId('admin-nav-security').click();
   await expect(adminPage.getByTestId('admin-security')).toBeVisible();
+  await expect(adminPage.getByTestId('admin-security')).toContainText('ADMIN / ROOT');
   await adminPage.getByTestId('admin-logout').click();
   await expect(adminPage.getByTestId('auth-page')).toBeVisible({ timeout: 20_000 });
 
@@ -540,6 +569,27 @@ test('管理员：首登强制改密、用户管理与独立控制台', async ({
   await expect(adminPage.getByTestId('admin-overview')).toBeVisible({ timeout: 30_000 });
   await expect(adminPage.getByTestId('admin-gate')).toHaveCount(0);
   await adminContext.close();
+
+  // 新建管理员首次登录必须改密，且只读进入团队页
+  const subContext = await browser.newContext();
+  const subPage = await subContext.newPage();
+  await subPage.goto('/');
+  await expect(subPage.getByTestId('auth-page')).toBeVisible();
+  await skipAuthIntro(subPage);
+  await subPage.getByTestId('auth-username').fill('e2e副管');
+  await subPage.getByTestId('auth-password').fill('E2eOps2026');
+  await subPage.getByTestId('auth-submit').click();
+  await expect(subPage.getByTestId('admin-gate')).toBeVisible({ timeout: 30_000 });
+  await subPage.getByTestId('admin-gate-current').fill('E2eOps2026');
+  await subPage.getByTestId('admin-gate-password').fill('E2eOps2027');
+  await subPage.getByTestId('admin-gate-confirm').fill('E2eOps2027');
+  await subPage.getByTestId('admin-gate-submit').click();
+  await expect(subPage.getByTestId('admin-overview')).toBeVisible({ timeout: 30_000 });
+  await subPage.getByRole('navigation', { name: '管理员导航', exact: true }).getByTestId('admin-nav-team').click();
+  await expect(subPage.getByTestId('admin-team')).toBeVisible();
+  await expect(subPage.getByTestId('admin-team')).toContainText('只有超级管理员可以新增');
+  await expect(subPage.getByTestId('admin-account-row')).toHaveCount(2);
+  await subContext.close();
 
   // 停用再启用会吊销 e2e演示员 的全部服务端会话；共享页面此刻仅靠内存态维持，
   // 任何 reload 都会回到登录页。这里重新登录，恢复后续用例的共享登录状态。
