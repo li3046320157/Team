@@ -99,16 +99,22 @@ function adminSummary(row) {
   };
 }
 
+const COUNT_PAGE = 200;
+const COUNT_MAX_PAGES = 50;
+
+// 线上数据库网关对 count exact 支持不稳定，改为分页读取主键计数。
 async function countRows(db, table, apply) {
-  let query = db.from(table).select('id', { count: 'exact' });
-  if (apply) query = apply(query);
-  const result = await query.limit(1);
-  if (result?.error || !Number.isSafeInteger(result?.count) || result.count < 0) {
-    const code = typeof result?.error?.code === 'string' ? result.error.code : 'count_unavailable';
-    console.error('database_count_failed', code);
-    throw new AppError('database_unavailable', 503);
+  let total = 0;
+  for (let page = 0; page < COUNT_MAX_PAGES; page += 1) {
+    let query = db.from(table).select('id');
+    if (apply) query = apply(query);
+    const batch = rows(await query
+      .order('id', { ascending: true })
+      .range(total, total + COUNT_PAGE - 1));
+    total += batch.length;
+    if (batch.length < COUNT_PAGE) break;
   }
-  return result.count;
+  return total;
 }
 
 async function fetchSafeUserById(db, id) {
